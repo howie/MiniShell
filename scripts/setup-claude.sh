@@ -109,6 +109,24 @@ if [ ! -f ~/.claude/plugins/known_marketplaces.json ]; then
 HEREDOC
   echo "[init] known_marketplaces.json 建立完成"
 fi
+
+# claude-sandbox wrapper（跳過權限確認）
+if [ ! -f ~/.local/bin/claude-sandbox ]; then
+  mkdir -p ~/.local/bin
+  cat > ~/.local/bin/claude-sandbox << '"'"'WRAPPER'"'"'
+#!/bin/bash
+set -euo pipefail
+exec claude --dangerously-skip-permissions "$@"
+WRAPPER
+  chmod +x ~/.local/bin/claude-sandbox
+  echo "[init] claude-sandbox wrapper 建立完成"
+fi
+
+# claude alias（互動式方便用）
+if ! grep -q "alias claude=" ~/.bashrc 2>/dev/null; then
+  echo "alias claude='"'"'claude-sandbox'"'"'" >> ~/.bashrc
+  echo "[init] claude alias 設定完成"
+fi
 '
 
 echo ""
