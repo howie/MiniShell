@@ -1,0 +1,50 @@
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_write:
+    - /sandbox
+    - /tmp
+    - /home/agent/.openclaw
+  read_only:
+    - /usr
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /etc
+
+landlock:
+  compatibility: best_effort
+
+network_policies:
+  google_ai:
+    name: google_ai
+    endpoints:
+      - { host: generativelanguage.googleapis.com, port: 443 }
+      - { host: aistudio.google.com, port: 443 }
+
+  ollama_local:
+    name: ollama_local
+    endpoints:
+      - { host: host.docker.internal, port: 11434 }
+
+  telegram:
+    name: telegram
+    endpoints:
+      - { host: api.telegram.org, port: 443 }
+
+  github:
+    name: github
+    endpoints:
+      - { host: github.com, port: 443 }
+      - { host: api.github.com, port: 443 }
+
+  web_search:
+    name: web_search
+    endpoints:
+      - { host: api.search.brave.com, port: 443 }
+
+  npm_registry:
+    name: npm_registry
+    endpoints:
+      - { host: registry.npmjs.org, port: 443 }
