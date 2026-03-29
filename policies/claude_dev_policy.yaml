@@ -198,3 +198,26 @@ network_policies:
       - { path: /usr/bin/wget }
       - { path: "/sandbox/.vscode-server/**" }
       - { path: "/sandbox/.vscode-remote-containers/**" }
+
+  messaging_discord:
+    name: messaging-discord
+    endpoints:
+      - { host: discord.com, port: 443 }
+      - { host: gateway.discord.gg, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }
+
+  messaging_telegram:
+    name: messaging-telegram
+    endpoints:
+      - { host: api.telegram.org, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }
+
+  messaging_slack:
+    name: messaging-slack
+    endpoints:
+      - { host: slack.com, port: 443 }
+      - { host: wss-primary.slack.com, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }

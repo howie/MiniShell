@@ -49,6 +49,7 @@ make verify           # 驗證隔離是否正常
 | `make setup-claw` | 建立 OpenClaw sandbox |
 | `make apply-policies` | 套用 `policies/` 目錄的 Policy YAML |
 | `make verify` | 驗證沙箱隔離 |
+| `make setup-bridge` | 安裝 Messaging Bridge（選配：Discord/Telegram/Slack） |
 | `make status` | 查看目前 sandbox / provider 狀態 |
 
 ---
@@ -66,11 +67,21 @@ openshell-env/
 │   ├── setup-claude.sh
 │   ├── setup-claw.sh
 │   ├── apply-policies.sh
-│   └── verify.sh
+│   ├── verify.sh
+│   └── setup-bridge.sh         # Messaging Bridge 安裝（選配）
+├── bridge/                     # Messaging Bridge 原始碼
+│   ├── package.json
+│   ├── start.sh
+│   └── src/
+│       ├── index.js
+│       ├── executor.js
+│       ├── platforms/          # Discord / Telegram / Slack
+│       └── utils/              # sanitize / chunker
 └── docs/                       # 文件
     ├── installation.md         # 完整安裝手冊（手動版）
     ├── usage.md                # 日常使用指南
-    └── learning.md             # 學習資源、架構說明、Policy YAML 詳解
+    ├── learning.md             # 學習資源、架構說明、Policy YAML 詳解
+    └── bridge-choose.md        # Bridge 架構選型分析
 ```
 
 ---
@@ -80,6 +91,7 @@ openshell-env/
 - [安裝手冊](docs/installation.md) — 手動安裝步驟參考、疑難排解
 - [日常使用](docs/usage.md) — 常用指令、Token 輪替（每 30 天）
 - [學習資源](docs/learning.md) — 架構說明、Policy YAML 欄位詳解、學習路徑
+- [Bridge 架構選型](docs/bridge-choose.md) — Discord/Telegram/Slack bridge 三種架構比較與安全分析
 
 ---
 

@@ -48,3 +48,15 @@ network_policies:
     name: npm_registry
     endpoints:
       - { host: registry.npmjs.org, port: 443 }
+
+  discord:
+    name: discord
+    endpoints:
+      - { host: discord.com, port: 443 }
+      - { host: gateway.discord.gg, port: 443 }
+
+  slack:
+    name: slack
+    endpoints:
+      - { host: slack.com, port: 443 }
+      - { host: wss-primary.slack.com, port: 443 }

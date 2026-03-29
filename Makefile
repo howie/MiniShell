@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 SCRIPTS := scripts
 
-.PHONY: help install install-base setup-claude setup-claw apply-policies verify status
+.PHONY: help install install-base setup-claude setup-claw apply-policies verify setup-bridge status
 
 # 預設 target：顯示說明
 help:
@@ -14,6 +14,7 @@ help:
 	@echo "  make setup-claw       建立 OpenClaw sandbox"
 	@echo "  make apply-policies   套用 Policy YAML（policies/ 目錄）"
 	@echo "  make verify           驗證沙箱隔離"
+	@echo "  make setup-bridge     安裝 Messaging Bridge（選配：Discord/Telegram/Slack）"
 	@echo "  make status           查看目前 sandbox 狀態"
 	@echo ""
 
@@ -44,6 +45,11 @@ apply-policies:
 verify:
 	@chmod +x $(SCRIPTS)/verify.sh
 	@$(SCRIPTS)/verify.sh
+
+# Messaging Bridge（選配）
+setup-bridge:
+	@chmod +x $(SCRIPTS)/setup-bridge.sh
+	@$(SCRIPTS)/setup-bridge.sh
 
 # 狀態查看
 status:
