@@ -127,6 +127,19 @@ if ! grep -q "alias claude=" ~/.bashrc 2>/dev/null; then
   echo "alias claude='"'"'claude-sandbox'"'"'" >> ~/.bashrc
   echo "[init] claude alias 設定完成"
 fi
+
+# Git credential helper — 用 GITHUB_TOKEN 認證 HTTPS
+if ! git config --global credential.helper 2>/dev/null | grep -q "echo"; then
+  git config --global credential.helper '"'"'!f() { echo "username=x-access-token"; echo "password=$GITHUB_TOKEN"; }; f'"'"'
+  echo "[init] git credential helper 設定完成"
+fi
+
+# Git user config
+if ! git config --global user.name &>/dev/null; then
+  git config --global user.name "Claude Dev"
+  git config --global user.email "claude-dev@sandbox.local"
+  echo "[init] git user.name / user.email 設定完成"
+fi
 '
 
 echo ""
