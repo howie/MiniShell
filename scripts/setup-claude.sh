@@ -57,6 +57,7 @@ else
   openshell sandbox create \
     --name claude-dev \
     --provider github-claude \
+    --auto-providers \
     -- claude
   info "Sandbox 建立完成"
 fi
@@ -67,7 +68,12 @@ echo "── 初始化 sandbox 內部環境 ────────────
 warn "即將在 sandbox 內執行初始化腳本（PATH、GIT_SSL_CAINFO、marketplace pre-clone）"
 echo "  這需要進入 sandbox 執行指令..."
 
-openshell sandbox connect claude-dev -- bash -c '
+# 確保 SSH config 包含 sandbox 設定
+if ! grep -q "Host openshell-claude-dev" ~/.ssh/config 2>/dev/null; then
+  openshell sandbox ssh-config claude-dev >> ~/.ssh/config
+fi
+
+ssh openshell-claude-dev bash -c '
 set -euo pipefail
 
 # 修 PATH
