@@ -25,7 +25,7 @@ fi
 # ── 建立 GitHub Provider ──────────────────────────────────────────────────────
 echo ""
 echo "── GitHub Provider（Claude Code 用）────────────────"
-if openshell provider list 2>/dev/null | grep -q "github-claude"; then
+if openshell provider list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "github-claude"; then
   info "Provider 'github-claude' 已存在，略過"
 else
   step "建立 github-claude provider"
@@ -50,7 +50,7 @@ fi
 # ── 建立 Sandbox ──────────────────────────────────────────────────────────────
 echo ""
 echo "── 建立 claude-dev sandbox ──────────────────────────"
-if openshell sandbox list 2>/dev/null | grep -q "claude-dev"; then
+if openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "claude-dev"; then
   info "Sandbox 'claude-dev' 已存在，略過"
 else
   step "建立 claude-dev sandbox..."

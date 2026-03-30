@@ -11,59 +11,114 @@ info()  { echo -e "${GREEN}[✓]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 step()  { echo -e "${BLUE}[→]${NC} $1"; }
 
+SANDBOX_NAME="claude-dev"
+SSH_HOST="openshell-${SANDBOX_NAME}"
+
+# 在 sandbox 內執行指令的輔助函式
+sandbox_exec() {
+  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$SSH_HOST" "$@"
+}
+
 # ── 前置確認 ───────────────────────────────────────────────────────────────────
 if ! command -v openshell &>/dev/null; then
   echo "請先執行 make install-base" >&2
   exit 1
 fi
 
-if ! openshell status 2>/dev/null | grep -q "Connected"; then
+if ! openshell status 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "Connected"; then
   echo "OpenShell Gateway 未在線，請先執行 openshell gateway start" >&2
   exit 1
 fi
 
-if ! openshell sandbox list 2>/dev/null | grep -q "claude-dev"; then
-  echo "Sandbox 'claude-dev' 不存在，請先執行 scripts/setup-claude.sh" >&2
+if ! openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "$SANDBOX_NAME"; then
+  echo "Sandbox '${SANDBOX_NAME}' 不存在，請先執行 scripts/setup-claude.sh" >&2
   exit 1
 fi
 
 info "前置確認通過"
 
-# ── Bot Token 申請說明 ─────────────────────────────────────────────────────────
-echo ""
-echo "── Bot Token 申請說明 ──────────────────────────────────"
-echo "Discord（可跳過，按 Enter）："
-echo "  1. https://discord.com/developers/applications → New Application"
-echo "  2. Bot 頁面 → Reset Token → 複製 token"
-echo "  3. Privileged Gateway Intents：開啟 Message Content Intent"
-echo "  4. OAuth2 → URL Generator → bot scope → 邀請到伺服器"
-echo ""
-echo "Telegram（可跳過，按 Enter）："
-echo "  1. Telegram 搜尋 @BotFather → /newbot"
-echo "  2. 設定名稱和 username"
-echo "  3. 複製收到的 token（格式：123456:ABC-DEF...）"
-echo ""
-echo "Slack（可跳過，按 Enter）："
-echo "  1. https://api.slack.com/apps → Create New App → From scratch"
-echo "  2. OAuth & Permissions → Bot Token Scopes："
-echo "     chat:write, app_mentions:read, channels:history, im:history, im:write"
-echo "  3. Socket Mode → Enable → 產生 App-Level Token（connections:write）"
-echo "  4. Install to Workspace → 複製 Bot Token（xoxb-...）和 App Token（xapp-...）"
-echo "──────────────────────────────────────────────────────────"
-echo ""
+# ── 安裝 SSH config（若尚未存在）───────────────────────────────────────────────
+if ! grep -q "$SSH_HOST" ~/.ssh/config 2>/dev/null; then
+  step "安裝 SSH config for ${SANDBOX_NAME}..."
+  mkdir -p ~/.ssh
+  echo "" >> ~/.ssh/config
+  openshell sandbox ssh-config "$SANDBOX_NAME" >> ~/.ssh/config
+  info "SSH config 已安裝"
+else
+  info "SSH config 已存在"
+fi
 
-# ── 互動式詢問 Token ───────────────────────────────────────────────────────────
-echo -n "Discord Bot Token（Enter 跳過）: "
-read -rs DISCORD_TOKEN; echo ""
+# ── 測試 SSH 連線 ─────────────────────────────────────────────────────────────
+step "測試 SSH 連線..."
+if ! sandbox_exec "echo ok" &>/dev/null; then
+  echo "無法 SSH 連線到 ${SANDBOX_NAME}" >&2
+  exit 1
+fi
+info "SSH 連線正常"
 
-echo -n "Telegram Bot Token（Enter 跳過）: "
-read -rs TELEGRAM_TOKEN; echo ""
+# ── 從 .env 載入 token（若存在）────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$(dirname "$SCRIPT_DIR")/.env"
 
-echo -n "Slack Bot Token（xoxb-...，Enter 跳過）: "
-read -rs SLACK_BOT_TOKEN; echo ""
+DISCORD_TOKEN=""
+TELEGRAM_TOKEN=""
+SLACK_BOT_TOKEN=""
+SLACK_APP_TOKEN=""
+TELEGRAM_ALLOWED_CHAT_IDS_ENV=""
+TELEGRAM_ALLOWED_USER_IDS_ENV=""
+SLACK_ALLOWED_USER_IDS_ENV=""
+SLACK_ALLOWED_CHANNEL_IDS_ENV=""
+DISCORD_ALLOWED_USER_IDS_ENV=""
+DISCORD_ALLOWED_CHANNEL_IDS_ENV=""
 
-echo -n "Slack App Token（xapp-...，Enter 跳過）: "
-read -rs SLACK_APP_TOKEN; echo ""
+if [ -f "$ENV_FILE" ]; then
+  info ".env 檔案找到，從中載入 token..."
+  while IFS= read -r line; do
+    # 忽略空行和注釋
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    # 解析 key=value
+    key="${line%%=*}"
+    value="${line#*=}"
+    # 去除前後空白
+    key="$(echo "$key" | xargs)"
+    value="$(echo "$value" | xargs)"
+    case "$key" in
+      TELEGRAM_TOKEN)               TELEGRAM_TOKEN="$value" ;;
+      SLACK_BOT_TOKEN)              SLACK_BOT_TOKEN="$value" ;;
+      SLACK_APP_TOKEN)              SLACK_APP_TOKEN="$value" ;;
+      DISCORD_TOKEN)                DISCORD_TOKEN="$value" ;;
+      TELEGRAM_ALLOWED_CHAT_IDS)    TELEGRAM_ALLOWED_CHAT_IDS_ENV="$value" ;;
+      TELEGRAM_ALLOWED_USER_IDS)    TELEGRAM_ALLOWED_USER_IDS_ENV="$value" ;;
+      SLACK_ALLOWED_USER_IDS)       SLACK_ALLOWED_USER_IDS_ENV="$value" ;;
+      SLACK_ALLOWED_CHANNEL_IDS)    SLACK_ALLOWED_CHANNEL_IDS_ENV="$value" ;;
+      DISCORD_ALLOWED_USER_IDS)     DISCORD_ALLOWED_USER_IDS_ENV="$value" ;;
+      DISCORD_ALLOWED_CHANNEL_IDS)  DISCORD_ALLOWED_CHANNEL_IDS_ENV="$value" ;;
+    esac
+  done < "$ENV_FILE"
+else
+  warn ".env 不存在，將進入互動式輸入（可複製 .env.example 建立）"
+fi
+
+# ── 互動式補齊缺少的 Token ────────────────────────────────────────────────────
+if [ -z "$DISCORD_TOKEN" ]; then
+  echo -n "Discord Bot Token（Enter 跳過）: "
+  read -rs DISCORD_TOKEN; echo ""
+fi
+
+if [ -z "$TELEGRAM_TOKEN" ]; then
+  echo -n "Telegram Bot Token（Enter 跳過）: "
+  read -rs TELEGRAM_TOKEN; echo ""
+fi
+
+if [ -z "$SLACK_BOT_TOKEN" ]; then
+  echo -n "Slack Bot Token（xoxb-...，Enter 跳過）: "
+  read -rs SLACK_BOT_TOKEN; echo ""
+fi
+
+if [ -z "$SLACK_APP_TOKEN" ]; then
+  echo -n "Slack App Token（xapp-...，Enter 跳過）: "
+  read -rs SLACK_APP_TOKEN; echo ""
+fi
 
 echo ""
 
@@ -76,8 +131,23 @@ SLACK_ENABLED="false"
 [[ -n "$TELEGRAM_TOKEN"  ]] && TELEGRAM_ENABLED="true"
 [[ -n "$SLACK_BOT_TOKEN" ]] && [[ -n "$SLACK_APP_TOKEN" ]] && SLACK_ENABLED="true"
 
-# ── 詢問允許的 ID（只問 enabled 的平台）─────────────────────────────────────────
-# 輔助函式：將空格分隔字串轉成 JSON 陣列
+if [[ "$TELEGRAM_ENABLED" == "true" ]]; then
+  info "Telegram: 啟用"
+else
+  warn "Telegram: 未啟用（缺少 token）"
+fi
+if [[ "$SLACK_ENABLED" == "true" ]]; then
+  info "Slack: 啟用"
+else
+  warn "Slack: 未啟用（需要 bot_token + app_token）"
+fi
+if [[ "$DISCORD_ENABLED" == "true" ]]; then
+  info "Discord: 啟用"
+else
+  info "Discord: 跳過"
+fi
+
+# ── 詢問允許的 ID（只問 enabled 且 .env 沒設定的平台）────────────────────────────
 ids_to_json_array() {
   local input="$1"
   if [[ -z "$input" ]]; then
@@ -94,14 +164,14 @@ ids_to_json_array() {
   echo "$result"
 }
 
-DISCORD_ALLOWED_USERS="[]"
-DISCORD_ALLOWED_CHANNELS="[]"
-TELEGRAM_ALLOWED_CHATS="[]"
-TELEGRAM_ALLOWED_USERS="[]"
-SLACK_ALLOWED_USERS="[]"
-SLACK_ALLOWED_CHANNELS="[]"
+DISCORD_ALLOWED_USERS=$(ids_to_json_array "${DISCORD_ALLOWED_USER_IDS_ENV:-}")
+DISCORD_ALLOWED_CHANNELS=$(ids_to_json_array "${DISCORD_ALLOWED_CHANNEL_IDS_ENV:-}")
+TELEGRAM_ALLOWED_CHATS=$(ids_to_json_array "${TELEGRAM_ALLOWED_CHAT_IDS_ENV:-}")
+TELEGRAM_ALLOWED_USERS=$(ids_to_json_array "${TELEGRAM_ALLOWED_USER_IDS_ENV:-}")
+SLACK_ALLOWED_USERS=$(ids_to_json_array "${SLACK_ALLOWED_USER_IDS_ENV:-}")
+SLACK_ALLOWED_CHANNELS=$(ids_to_json_array "${SLACK_ALLOWED_CHANNEL_IDS_ENV:-}")
 
-if [[ "$DISCORD_ENABLED" == "true" ]]; then
+if [[ "$DISCORD_ENABLED" == "true" && -z "${DISCORD_ALLOWED_USER_IDS_ENV:-}" ]]; then
   echo "── Discord 允許的 ID ────────────────────────────────────"
   echo "  提示：Discord 右鍵帳號 → Copy User ID 取得 User ID"
   echo "  以空格分隔多個 ID，留空=不限制（不建議，僅私人 bot 使用）"
@@ -114,7 +184,7 @@ if [[ "$DISCORD_ENABLED" == "true" ]]; then
   DISCORD_ALLOWED_CHANNELS=$(ids_to_json_array "$_discord_channels")
 fi
 
-if [[ "$TELEGRAM_ENABLED" == "true" ]]; then
+if [[ "$TELEGRAM_ENABLED" == "true" && -z "${TELEGRAM_ALLOWED_CHAT_IDS_ENV:-}" ]]; then
   echo "── Telegram 允許的 ID ───────────────────────────────────"
   echo "  提示：@userinfobot 取得 chat id"
   echo "  以空格分隔多個 ID，留空=不限制（不建議，僅私人 bot 使用）"
@@ -127,7 +197,7 @@ if [[ "$TELEGRAM_ENABLED" == "true" ]]; then
   TELEGRAM_ALLOWED_USERS=$(ids_to_json_array "$_telegram_users")
 fi
 
-if [[ "$SLACK_ENABLED" == "true" ]]; then
+if [[ "$SLACK_ENABLED" == "true" && -z "${SLACK_ALLOWED_USER_IDS_ENV:-}" ]]; then
   echo "── Slack 允許的 ID ──────────────────────────────────────"
   echo "  以空格分隔多個 ID，留空=不限制（不建議，僅私人 bot 使用）"
   echo -n "  允許的 User IDs: "
@@ -139,27 +209,8 @@ if [[ "$SLACK_ENABLED" == "true" ]]; then
   SLACK_ALLOWED_CHANNELS=$(ids_to_json_array "$_slack_channels")
 fi
 
-# ── 建立 sandbox 目錄結構 ──────────────────────────────────────────────────────
-step "建立 sandbox 目錄結構..."
-openshell sandbox connect claude-dev -- bash -c '
-  mkdir -p /sandbox/messaging-bridge/src/platforms
-  mkdir -p /sandbox/messaging-bridge/src/utils
-  mkdir -p /sandbox/messaging-bridge/logs
-'
-info "目錄結構建立完成"
-
-# ── 傳輸 bridge 原始碼（base64）────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ── 傳輸 bridge 原始碼 ────────────────────────────────────────────────────────
 BRIDGE_DIR="$(dirname "$SCRIPT_DIR")/bridge"
-
-transfer_file() {
-  local src="$1"
-  local dst="$2"
-  step "傳輸 $(basename "$src") → $dst"
-  local b64
-  b64=$(base64 < "$src" | tr -d '\n')
-  echo "${b64}" | openshell sandbox connect claude-dev -- bash -c "base64 -d > '${dst}'"
-}
 
 step "確認 bridge 原始碼存在..."
 REQUIRED_FILES=(
@@ -181,24 +232,20 @@ for f in "${REQUIRED_FILES[@]}"; do
 done
 info "Bridge 原始碼確認完成"
 
-transfer_file "${BRIDGE_DIR}/package.json"                    "/sandbox/messaging-bridge/package.json"
-transfer_file "${BRIDGE_DIR}/start.sh"                        "/sandbox/messaging-bridge/start.sh"
-transfer_file "${BRIDGE_DIR}/src/index.js"                    "/sandbox/messaging-bridge/src/index.js"
-transfer_file "${BRIDGE_DIR}/src/executor.js"                 "/sandbox/messaging-bridge/src/executor.js"
-transfer_file "${BRIDGE_DIR}/src/platforms/discord.js"        "/sandbox/messaging-bridge/src/platforms/discord.js"
-transfer_file "${BRIDGE_DIR}/src/platforms/slack.js"          "/sandbox/messaging-bridge/src/platforms/slack.js"
-transfer_file "${BRIDGE_DIR}/src/platforms/telegram.js"       "/sandbox/messaging-bridge/src/platforms/telegram.js"
-transfer_file "${BRIDGE_DIR}/src/utils/chunker.js"            "/sandbox/messaging-bridge/src/utils/chunker.js"
-transfer_file "${BRIDGE_DIR}/src/utils/sanitize.js"           "/sandbox/messaging-bridge/src/utils/sanitize.js"
+step "建立 sandbox 目錄結構..."
+sandbox_exec "mkdir -p /sandbox/messaging-bridge/src/platforms /sandbox/messaging-bridge/src/utils /sandbox/messaging-bridge/logs"
+info "目錄結構建立完成"
 
-openshell sandbox connect claude-dev -- bash -c 'chmod +x /sandbox/messaging-bridge/start.sh'
-info "原始碼傳輸完成"
+step "上傳 bridge 原始碼..."
+openshell sandbox upload "$SANDBOX_NAME" "$BRIDGE_DIR/" /sandbox/messaging-bridge
+info "原始碼上傳完成"
+
+sandbox_exec "chmod +x /sandbox/messaging-bridge/start.sh"
 
 # ── 建立 bridge.config.json ────────────────────────────────────────────────────
 step "建立 bridge.config.json..."
 
 json_escape() {
-  # 轉義 JSON string 特殊字元
   printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])'
 }
 
@@ -237,27 +284,23 @@ CONFIG_JSON=$(cat <<CONFIGEOF
 CONFIGEOF
 )
 
-CONFIG_B64=$(echo "$CONFIG_JSON" | base64 | tr -d '\n')
-echo "${CONFIG_B64}" | openshell sandbox connect claude-dev -- bash -c "base64 -d > /sandbox/messaging-bridge/bridge.config.json && chmod 600 /sandbox/messaging-bridge/bridge.config.json"
+echo "$CONFIG_JSON" | sandbox_exec "cat > /sandbox/messaging-bridge/bridge.config.json && chmod 600 /sandbox/messaging-bridge/bridge.config.json"
 info "bridge.config.json 建立完成（權限 600）"
 
 # ── npm install ────────────────────────────────────────────────────────────────
-step "在 sandbox 內執行 npm install..."
-openshell sandbox connect claude-dev -- bash -c 'cd /sandbox/messaging-bridge && npm install --save-exact'
+step "在本機安裝 npm 依賴（繞過 sandbox proxy 限制）..."
+(cd "$BRIDGE_DIR" && npm install --save-exact --no-progress 2>&1 | tail -3)
 info "npm install 完成"
+
+step "上傳 node_modules 到 sandbox..."
+openshell sandbox upload "$SANDBOX_NAME" "$BRIDGE_DIR/node_modules" /sandbox/messaging-bridge/node_modules
+info "node_modules 上傳完成"
 
 # ── 啟動 bridge ───────────────────────────────────────────────────────────────
 step "啟動 messaging bridge..."
-openshell sandbox connect claude-dev -- bash -c '
-  cd /sandbox/messaging-bridge
-  if [ -f bridge.pid ] && kill -0 $(cat bridge.pid) 2>/dev/null; then
-    echo "[bridge] 已在運行中（PID $(cat bridge.pid)），跳過啟動"
-  else
-    bash start.sh
-  fi
-'
+sandbox_exec 'cd /sandbox/messaging-bridge && if [ -f bridge.pid ] && kill -0 $(cat bridge.pid) 2>/dev/null; then echo "[bridge] 停止舊程序..."; kill $(cat bridge.pid); sleep 1; fi; bash start.sh'
 info "Bridge 已啟動！"
 echo ""
 echo "  管理指令："
-echo "  openshell sandbox connect claude-dev -- bash -c 'cat /sandbox/messaging-bridge/logs/bridge.log'"
-echo "  openshell sandbox connect claude-dev -- bash -c 'kill \$(cat /sandbox/messaging-bridge/bridge.pid)'"
+echo "  ssh ${SSH_HOST} 'cat /sandbox/messaging-bridge/logs/bridge.log'"
+echo "  ssh ${SSH_HOST} 'kill \$(cat /sandbox/messaging-bridge/bridge.pid)'"
