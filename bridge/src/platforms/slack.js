@@ -1,6 +1,7 @@
 'use strict';
 
 const { App } = require('@slack/bolt');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const { execute } = require('../executor');
 const { sanitize } = require('../utils/sanitize');
 const { chunk } = require('../utils/chunker');
@@ -30,11 +31,15 @@ async function start(config) {
     return null;
   }
 
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+  const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+
   const app = new App({
     token: bot_token,
     appToken: app_token,
     signingSecret: signing_secret,
     socketMode: true,
+    agent,
   });
 
   /**

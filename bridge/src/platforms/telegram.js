@@ -1,6 +1,7 @@
 'use strict';
 
 const { Bot } = require('grammy');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const { execute } = require('../executor');
 const { sanitize } = require('../utils/sanitize');
 const { chunk } = require('../utils/chunker');
@@ -23,7 +24,12 @@ async function start(config) {
     allowed_user_ids = [],
   } = config;
 
-  const bot = new Bot(token);
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+  const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+
+  const bot = new Bot(token, {
+    client: { baseFetchConfig: { agent } },
+  });
 
   /**
    * Check access and handle a prompt.
