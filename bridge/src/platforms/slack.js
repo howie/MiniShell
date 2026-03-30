@@ -32,7 +32,15 @@ async function start(config) {
   }
 
   const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
-  const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+  let agent;
+  if (proxyUrl) {
+    try {
+      agent = new HttpsProxyAgent(proxyUrl);
+    } catch (err) {
+      console.error(`[slack] Invalid proxy URL in HTTPS_PROXY "${proxyUrl}": ${err.message}`);
+      return null;
+    }
+  }
 
   const app = new App({
     token: bot_token,

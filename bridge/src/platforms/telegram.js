@@ -25,7 +25,15 @@ async function start(config) {
   } = config;
 
   const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
-  const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+  let agent;
+  if (proxyUrl) {
+    try {
+      agent = new HttpsProxyAgent(proxyUrl);
+    } catch (err) {
+      console.error(`[telegram] Invalid proxy URL in HTTPS_PROXY "${proxyUrl}": ${err.message}`);
+      return null;
+    }
+  }
 
   const bot = new Bot(token, {
     client: { baseFetchConfig: { agent } },
@@ -106,9 +114,15 @@ async function start(config) {
     console.error('[telegram] Bot error:', err.message || err);
   });
 
-  bot.start({ drop_pending_updates: true })
-    .then(() => console.log('[telegram] Bot started (long polling).'))
-    .catch((err) => console.error('[telegram] bot.start() error:', err.message || err));
+  await new Promise((resolve, reject) => {
+    bot.start({
+      drop_pending_updates: true,
+      onStart: () => {
+        console.log('[telegram] Bot started (long polling).');
+        resolve();
+      },
+    }).catch(reject);
+  });
 
   return bot;
 }
