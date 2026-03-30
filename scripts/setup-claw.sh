@@ -87,10 +87,37 @@ else
   info "Sandbox 建立完成"
 fi
 
+# ── 設定 OpenClaw Inference ──────────────────────────────────────────────────
+echo ""
+echo "── 設定 OpenClaw Inference ──────────────────────────"
+
+# 確認 ollama-local provider 是否存在
+if openshell provider list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "ollama-local"; then
+  step "設定 inference routing（ollama-local 為預設）..."
+  openshell inference set \
+    --sandbox claw-agent \
+    --provider ollama-local \
+    --model qwen3:8b 2>/dev/null && info "Inference routing 已設定" || \
+    warn "Inference routing 設定失敗（可能 openshell 版本不支援 --sandbox flag）"
+else
+  warn "Provider 'ollama-local' 不存在"
+  warn "請先執行 make setup-ollama 以啟用本地推理"
+  warn "目前 claw-agent 將使用 Gemini Flash 雲端 API"
+fi
+
 echo ""
 info "OpenClaw sandbox 建立完成！"
 echo ""
 echo "  下一步："
 echo "  1. openshell sandbox connect claw-agent"
-echo "  2. openclaw onboard --auth-choice google-api-key"
-echo "  3. 在 OpenClaw 內用 /model google/gemini-3-flash 確認模型"
+echo "  2. openclaw onboard --auth-choice openai-compatible"
+echo "     Base URL: https://inference.local/v1"
+echo "  3. 驗證推理："
+echo "     curl https://inference.local/v1/models"
+echo ""
+echo "  切換推理後端（在 sandbox 外執行）："
+echo "  本地 Ollama ："
+echo "    openshell inference set --sandbox claw-agent --provider ollama-local --model qwen3:8b"
+echo "  雲端 Gemini ："
+echo "    openshell inference set --sandbox claw-agent --provider gemini-flash --model gemini-3-flash"
+echo ""
