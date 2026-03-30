@@ -17,7 +17,7 @@ if ! command -v openshell &>/dev/null; then
   exit 1
 fi
 
-if ! openshell status 2>/dev/null | grep -q "Connected"; then
+if ! openshell status 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "Connected"; then
   echo "OpenShell Gateway 未在線，請先執行 openshell gateway start" >&2
   exit 1
 fi
@@ -25,7 +25,7 @@ fi
 # ── 建立 GitHub Provider（OpenClaw 用）────────────────────────────────────────
 echo ""
 echo "── GitHub Provider（OpenClaw 用）───────────────────"
-if openshell provider list 2>/dev/null | grep -q "github-claw"; then
+if openshell provider list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "github-claw"; then
   info "Provider 'github-claw' 已存在，略過"
 else
   step "建立 github-claw provider"
@@ -50,7 +50,7 @@ fi
 # ── 建立 Gemini Provider ──────────────────────────────────────────────────────
 echo ""
 echo "── Gemini Provider ──────────────────────────────────"
-if openshell provider list 2>/dev/null | grep -q "gemini-flash"; then
+if openshell provider list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "gemini-flash"; then
   info "Provider 'gemini-flash' 已存在，略過"
 else
   step "建立 gemini-flash provider"
@@ -75,7 +75,7 @@ fi
 # ── 建立 Sandbox ──────────────────────────────────────────────────────────────
 echo ""
 echo "── 建立 claw-agent sandbox ──────────────────────────"
-if openshell sandbox list 2>/dev/null | grep -q "claw-agent"; then
+if openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "claw-agent"; then
   info "Sandbox 'claw-agent' 已存在，略過"
 else
   step "建立 claw-agent sandbox..."
@@ -92,7 +92,9 @@ echo ""
 echo "── 設定 OpenClaw Inference ──────────────────────────"
 
 # 確認 ollama-local provider 是否存在
+HAS_OLLAMA=false
 if openshell provider list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "ollama-local"; then
+  HAS_OLLAMA=true
   step "設定 inference routing（ollama-local 為預設）..."
   openshell inference set \
     --sandbox claw-agent \
@@ -110,14 +112,21 @@ info "OpenClaw sandbox 建立完成！"
 echo ""
 echo "  下一步："
 echo "  1. openshell sandbox connect claw-agent"
-echo "  2. openclaw onboard --auth-choice openai-compatible"
-echo "     Base URL: https://inference.local/v1"
-echo "  3. 驗證推理："
-echo "     curl https://inference.local/v1/models"
-echo ""
-echo "  切換推理後端（在 sandbox 外執行）："
-echo "  本地 Ollama ："
-echo "    openshell inference set --sandbox claw-agent --provider ollama-local --model qwen3:8b"
-echo "  雲端 Gemini ："
-echo "    openshell inference set --sandbox claw-agent --provider gemini-flash --model gemini-3-flash"
+if [ "$HAS_OLLAMA" = true ]; then
+  echo "  2. openclaw onboard --auth-choice openai-compatible"
+  echo "     Base URL: https://inference.local/v1"
+  echo "  3. 驗證推理："
+  echo "     curl https://inference.local/v1/models"
+  echo ""
+  echo "  切換推理後端（在 sandbox 外執行）："
+  echo "  本地 Ollama ："
+  echo "    openshell inference set --sandbox claw-agent --provider ollama-local --model qwen3:8b"
+  echo "  雲端 Gemini ："
+  echo "    openshell inference set --sandbox claw-agent --provider gemini-flash --model gemini-3-flash"
+else
+  echo "  2. openclaw onboard --auth-choice google-api-key"
+  echo "     （需要 Google Gemini API key）"
+  echo ""
+  echo "  若日後啟用本地推理，請先執行 make setup-ollama，再重新執行 make setup-claw"
+fi
 echo ""

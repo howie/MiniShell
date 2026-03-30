@@ -1,6 +1,7 @@
 'use strict';
 
 const { App } = require('@slack/bolt');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const { execute } = require('../executor');
 const { sanitize } = require('../utils/sanitize');
 const { chunk } = require('../utils/chunker');
@@ -30,11 +31,24 @@ async function start(config) {
     return null;
   }
 
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+  let agent;
+  if (proxyUrl) {
+    try {
+      agent = new HttpsProxyAgent(proxyUrl);
+      console.log(`[slack] Using proxy: ${proxyUrl}`);
+    } catch (err) {
+      console.error(`[slack] Invalid proxy URL in HTTPS_PROXY "${proxyUrl}": ${err.message}`);
+      return null;
+    }
+  }
+
   const app = new App({
     token: bot_token,
     appToken: app_token,
     signingSecret: signing_secret,
     socketMode: true,
+    agent,
   });
 
   /**
@@ -72,7 +86,16 @@ async function start(config) {
       return;
     }
 
-    const result = await execute(prompt, null);
+    let result;
+    try {
+      result = await execute(prompt, null);
+    } catch (err) {
+      console.error('[slack] execute() threw:', err);
+      try {
+        await client.chat.update({ channel: channelId, ts: processingTs, text: '❌ 執行錯誤，請稍後再試。' });
+      } catch (_) { /* best-effort */ }
+      return;
+    }
 
     const output = result.success
       ? result.output || '(no output)'
@@ -89,6 +112,12 @@ async function start(config) {
       });
     } catch (err) {
       console.error('[slack] Failed to update processing message:', err);
+      // Fallback: send as new message so the result isn't lost
+      try {
+        await say(chunks[0]);
+      } catch (e) {
+        console.error('[slack] Failed to send fallback message:', e);
+      }
     }
 
     // Post remaining chunks

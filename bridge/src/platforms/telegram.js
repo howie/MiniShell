@@ -1,6 +1,7 @@
 'use strict';
 
 const { Bot } = require('grammy');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const { execute } = require('../executor');
 const { sanitize } = require('../utils/sanitize');
 const { chunk } = require('../utils/chunker');
@@ -23,7 +24,21 @@ async function start(config) {
     allowed_user_ids = [],
   } = config;
 
-  const bot = new Bot(token);
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+  let agent;
+  if (proxyUrl) {
+    try {
+      agent = new HttpsProxyAgent(proxyUrl);
+      console.log(`[telegram] Using proxy: ${proxyUrl}`);
+    } catch (err) {
+      console.error(`[telegram] Invalid proxy URL in HTTPS_PROXY "${proxyUrl}": ${err.message}`);
+      return null;
+    }
+  }
+
+  const bot = new Bot(token, {
+    client: { baseFetchConfig: { agent } },
+  });
 
   /**
    * Check access and handle a prompt.
@@ -31,7 +46,7 @@ async function start(config) {
   async function handleMessage(ctx) {
     const chatId = ctx.chat && ctx.chat.id;
     const userId = ctx.from && ctx.from.id;
-    const text = ctx.message && ctx.message.text || '';
+    const text = ctx.message?.text || '';
 
     // Chat whitelist check
     if (allowed_chat_ids.length > 0 && !allowed_chat_ids.map(String).includes(String(chatId))) {
@@ -58,7 +73,16 @@ async function start(config) {
       return;
     }
 
-    const result = await execute(prompt, null);
+    let result;
+    try {
+      result = await execute(prompt, null);
+    } catch (err) {
+      console.error('[telegram] execute() threw:', err);
+      try {
+        await ctx.api.editMessageText(chatId, processingMsg.message_id, '❌ 執行錯誤，請稍後再試。');
+      } catch (_) { /* best-effort */ }
+      return;
+    }
 
     const output = result.success
       ? result.output || '(no output)'
@@ -71,6 +95,12 @@ async function start(config) {
       await ctx.api.editMessageText(chatId, processingMsg.message_id, chunks[0]);
     } catch (err) {
       console.error('[telegram] Failed to edit processing message:', err);
+      // Fallback: send as new message so the result isn't lost
+      try {
+        await ctx.reply(chunks[0]);
+      } catch (e) {
+        console.error('[telegram] Failed to send fallback reply:', e);
+      }
     }
 
     // Send remaining chunks
@@ -83,22 +113,34 @@ async function start(config) {
     }
   }
 
-  // Handle /claude command
-  bot.command('claude', (ctx) => handleMessage(ctx));
+  // Handle /claude command (private chats only)
+  bot.command('claude', async (ctx) => {
+    if (ctx.chat.type !== 'private') return;
+    await handleMessage(ctx);
+  });
 
   // Handle plain messages in private chats
-  bot.on('message:text', (ctx) => {
+  bot.on('message:text', async (ctx) => {
     if (ctx.chat.type !== 'private') return;
     if (/^\/claude(\s|$)/i.test(ctx.message.text)) return; // handled by command
-    handleMessage(ctx);
+    await handleMessage(ctx);
   });
 
   bot.catch((err) => {
-    console.error('[telegram] Bot error:', err.message || err);
+    const updateInfo = err.ctx?.update ? JSON.stringify(err.ctx.update) : 'N/A';
+    console.error('[telegram] Bot error — update:', updateInfo);
+    console.error('[telegram] Bot error — cause:', err.error || err);
   });
 
-  await bot.start({ drop_pending_updates: true });
-  console.log('[telegram] Bot started (long polling).');
+  await new Promise((resolve, reject) => {
+    bot.start({
+      drop_pending_updates: true,
+      onStart: () => {
+        console.log('[telegram] Bot started (long polling).');
+        resolve();
+      },
+    }).catch(reject);
+  });
 
   return bot;
 }

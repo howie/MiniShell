@@ -57,6 +57,7 @@ else
   openshell sandbox create \
     --name claude-dev \
     --provider github-claude \
+    --auto-providers \
     -- claude
   info "Sandbox 建立完成"
 fi
@@ -67,7 +68,17 @@ echo "── 初始化 sandbox 內部環境 ────────────
 warn "即將在 sandbox 內執行初始化腳本（PATH、GIT_SSL_CAINFO、marketplace pre-clone）"
 echo "  這需要進入 sandbox 執行指令..."
 
-openshell sandbox connect claude-dev -- bash -c '
+# 確保 SSH config 包含 sandbox 設定
+if ! grep -q "Host openshell-claude-dev" ~/.ssh/config 2>/dev/null; then
+  SSH_CONFIG_BLOCK=$(openshell sandbox ssh-config claude-dev)
+  if [[ -z "$SSH_CONFIG_BLOCK" ]]; then
+    echo "ssh-config 輸出為空，請確認 sandbox 已啟動" >&2
+    exit 1
+  fi
+  echo "$SSH_CONFIG_BLOCK" >> ~/.ssh/config
+fi
+
+ssh openshell-claude-dev bash -c '
 set -euo pipefail
 
 # 修 PATH
@@ -129,7 +140,7 @@ if ! grep -q "alias claude=" ~/.bashrc 2>/dev/null; then
 fi
 
 # Git credential helper — 用 GITHUB_TOKEN 認證 HTTPS
-if ! git config --global credential.helper 2>/dev/null | grep -q "echo"; then
+if ! git config --global credential.helper 2>/dev/null | grep -q "x-access-token"; then
   git config --global credential.helper '"'"'!f() { echo "username=x-access-token"; echo "password=$GITHUB_TOKEN"; }; f'"'"'
   echo "[init] git credential helper 設定完成"
 fi

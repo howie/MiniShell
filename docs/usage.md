@@ -63,6 +63,16 @@ claude                                          # 啟動 Claude Code
 /logout && /login                               # 重新認證
 ```
 
+### Git 操作（在 Claude sandbox 內）
+
+```bash
+source ~/.bashrc                                # 載入 GIT_SSL_CAINFO（每次進入 sandbox 後建議執行）
+git clone https://github.com/user/repo.git     # Clone repo
+git push                                        # 推送（需要 PAT Contents write 權限）
+```
+
+> 詳細說明、手動設定方法、常見問題請參考 [sandbox-git.md](./sandbox-git.md)
+
 ### 在 OpenClaw sandbox 內
 
 ```bash

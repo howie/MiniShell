@@ -107,7 +107,7 @@ network_policies:
         protocol: rest
         tls: terminate
         enforcement: enforce
-        access: full
+        access: read-only
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }

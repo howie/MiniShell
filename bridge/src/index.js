@@ -34,14 +34,14 @@ async function main() {
   results.forEach((r, i) => {
     if (r.status === 'rejected') {
       const names = ['discord', 'telegram', 'slack'];
-      console.error(`[bridge] Platform ${names[i]} failed to start:`, r.reason);
+      console.error(`[bridge] Platform ${names[i]} failed to start:`, r.reason?.stack || r.reason);
     }
   });
 
   // Check if at least one platform is active
   const anyActive = Object.values(instances).some((inst) => inst != null);
   if (!anyActive) {
-    console.warn('[bridge] WARNING: No messaging platforms are enabled. Exiting.');
+    console.error('[bridge] WARNING: No messaging platforms are enabled. Exiting.');
     process.exit(1);
   }
 
