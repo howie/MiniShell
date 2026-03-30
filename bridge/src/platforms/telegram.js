@@ -89,8 +89,11 @@ async function start(config) {
     }
   }
 
-  // Handle /claude command
-  bot.command('claude', (ctx) => handleMessage(ctx));
+  // Handle /claude command (private chats only)
+  bot.command('claude', (ctx) => {
+    if (ctx.chat.type !== 'private') return;
+    handleMessage(ctx);
+  });
 
   // Handle plain messages in private chats
   bot.on('message:text', (ctx) => {
@@ -103,8 +106,9 @@ async function start(config) {
     console.error('[telegram] Bot error:', err.message || err);
   });
 
-  await bot.start({ drop_pending_updates: true });
-  console.log('[telegram] Bot started (long polling).');
+  bot.start({ drop_pending_updates: true })
+    .then(() => console.log('[telegram] Bot started (long polling).'))
+    .catch((err) => console.error('[telegram] bot.start() error:', err.message || err));
 
   return bot;
 }

@@ -289,7 +289,8 @@ info "bridge.config.json 建立完成（權限 600）"
 
 # ── npm install ────────────────────────────────────────────────────────────────
 step "在本機安裝 npm 依賴（繞過 sandbox proxy 限制）..."
-(cd "$BRIDGE_DIR" && npm install --save-exact --no-progress 2>&1 | tail -3)
+npm_output="$(cd "$BRIDGE_DIR" && npm install --save-exact --no-progress 2>&1)" || { printf '%s\n' "$npm_output" | tail -3; exit 1; }
+printf '%s\n' "$npm_output" | tail -3
 info "npm install 完成"
 
 step "上傳 node_modules 到 sandbox..."
