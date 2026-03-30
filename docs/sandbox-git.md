@@ -116,18 +116,24 @@ git config --global user.email "claude-dev@sandbox.local"
 
 ## Policy 設定確認
 
-git push 需要 policy 允許 `git-receive-pack`。確認 `policies/claude_dev_policy.yaml` 的 GitHub API policy block 包含正確設定：
+git push 需要 policy 允許 `git-receive-pack`。確認 `policies/claude_dev_policy.yaml` 的 `github_ssh_over_https` block 包含正確設定：
 
 ```yaml
 network_policies:
-  github_api:
-    name: github-api
+  github_ssh_over_https:
+    name: github-ssh-over-https
     endpoints:
       - host: github.com
         port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        rules:
+          - allow:
+              method: POST
+              path: "/**/git-receive-pack"
     binaries:
       - { path: /usr/bin/git }
-      - { path: /usr/lib/git-core/git-remote-https }
 ```
 
 如果 push 被 403 擋住，查 deny log：

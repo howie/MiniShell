@@ -79,9 +79,11 @@ if [ -f "$ENV_FILE" ]; then
     # 解析 key=value
     key="${line%%=*}"
     value="${line#*=}"
-    # 去除前後空白
-    key="$(echo "$key" | xargs)"
-    value="$(echo "$value" | xargs)"
+    # 去除前後空白（純 bash，避免 xargs 在空值時觸發 set -e）
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
     case "$key" in
       TELEGRAM_TOKEN)               TELEGRAM_TOKEN="$value" ;;
       SLACK_BOT_TOKEN)              SLACK_BOT_TOKEN="$value" ;;
@@ -246,7 +248,10 @@ sandbox_exec "chmod +x /sandbox/messaging-bridge/start.sh"
 step "建立 bridge.config.json..."
 
 json_escape() {
-  printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])'
+  printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])' || {
+    echo "json_escape 失敗 — python3 不可用或執行錯誤" >&2
+    exit 1
+  }
 }
 
 DISCORD_TOKEN_ESC=$(json_escape "$DISCORD_TOKEN")
@@ -289,7 +294,11 @@ info "bridge.config.json 建立完成（權限 600）"
 
 # ── npm install ────────────────────────────────────────────────────────────────
 step "在本機安裝 npm 依賴（繞過 sandbox proxy 限制）..."
-npm_output="$(cd "$BRIDGE_DIR" && npm install --save-exact --no-progress 2>&1)" || { printf '%s\n' "$npm_output" | tail -3; exit 1; }
+npm_output="$(cd "$BRIDGE_DIR" && npm install --save-exact --no-progress 2>&1)" || {
+  printf '%s\n' "$npm_output" | tail -30
+  echo "npm install 失敗，請確認 node/npm 版本與 package.json 內容" >&2
+  exit 1
+}
 printf '%s\n' "$npm_output" | tail -3
 info "npm install 完成"
 
@@ -300,6 +309,14 @@ info "node_modules 上傳完成"
 # ── 啟動 bridge ───────────────────────────────────────────────────────────────
 step "啟動 messaging bridge..."
 sandbox_exec 'cd /sandbox/messaging-bridge && if [ -f bridge.pid ] && kill -0 $(cat bridge.pid) 2>/dev/null; then echo "[bridge] 停止舊程序..."; kill $(cat bridge.pid); sleep 1; fi; bash start.sh'
+
+# 確認 bridge process 確實在執行
+sleep 2
+if ! sandbox_exec 'kill -0 $(cat /sandbox/messaging-bridge/bridge.pid 2>/dev/null) 2>/dev/null'; then
+  echo "Bridge 啟動失敗，最後 20 行 log：" >&2
+  sandbox_exec 'tail -20 /sandbox/messaging-bridge/logs/bridge.log 2>/dev/null || echo "(log 不存在)"' >&2
+  exit 1
+fi
 info "Bridge 已啟動！"
 echo ""
 echo "  管理指令："
