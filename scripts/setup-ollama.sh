@@ -71,7 +71,7 @@ echo ""
 echo "── 下載模型 ─────────────────────────────────────────"
 DEFAULT_MODEL="qwen3:8b"
 
-if ollama list 2>/dev/null | grep -q "^${DEFAULT_MODEL}"; then
+if ollama list 2>/dev/null | grep -q "${DEFAULT_MODEL}"; then
   info "模型 ${DEFAULT_MODEL} 已存在"
 else
   step "下載 ${DEFAULT_MODEL}（約 5GB，請稍候）..."
@@ -83,7 +83,7 @@ fi
 echo ""
 echo "── 建立 OpenShell Provider ──────────────────────────"
 
-if openshell provider list 2>/dev/null | grep -q "ollama-local"; then
+if openshell provider list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "ollama-local"; then
   info "Provider 'ollama-local' 已存在，略過"
 else
   step "建立 ollama-local provider..."
@@ -101,7 +101,7 @@ fi
 echo ""
 echo "── 設定 Inference Routing ───────────────────────────"
 
-if openshell sandbox list 2>/dev/null | grep -q "claw-agent"; then
+if openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "claw-agent"; then
   step "設定 claw-agent 使用 ollama-local 作為預設推理後端..."
   openshell inference set \
     --sandbox claw-agent \
