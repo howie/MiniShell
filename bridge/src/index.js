@@ -63,8 +63,8 @@ async function main() {
 
     if (instances.telegram) {
       shutdownTasks.push(
-        instances.telegram.stopPolling().catch((e) =>
-          console.error('[bridge] Error stopping Telegram polling:', e)
+        instances.telegram.stop().catch((e) =>
+          console.error('[bridge] Error stopping Telegram bot:', e)
         )
       );
     }

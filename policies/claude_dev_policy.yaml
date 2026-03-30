@@ -107,7 +107,7 @@ network_policies:
         protocol: rest
         tls: terminate
         enforcement: enforce
-        access: read-only
+        access: full
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
@@ -129,6 +129,9 @@ network_policies:
           - allow:
               method: POST
               path: "/**/git-upload-pack"
+          - allow:
+              method: POST
+              path: "/**/git-receive-pack"
     binaries:
       - { path: /usr/bin/git }
 
@@ -218,6 +221,7 @@ network_policies:
     name: messaging-slack
     endpoints:
       - { host: slack.com, port: 443 }
+      - { host: api.slack.com, port: 443 }
       - { host: wss-primary.slack.com, port: 443 }
     binaries:
       - { path: /usr/bin/node }

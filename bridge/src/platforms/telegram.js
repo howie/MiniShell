@@ -1,6 +1,6 @@
 'use strict';
 
-const TelegramBot = require('node-telegram-bot-api');
+const { Bot } = require('grammy');
 const { execute } = require('../executor');
 const { sanitize } = require('../utils/sanitize');
 const { chunk } = require('../utils/chunker');
@@ -23,39 +23,36 @@ async function start(config) {
     allowed_user_ids = [],
   } = config;
 
-  const bot = new TelegramBot(token, { polling: true });
-
-  console.log('[telegram] Bot started (polling mode).');
+  const bot = new Bot(token);
 
   /**
-   * Handle an incoming message object.
+   * Check access and handle a prompt.
    */
-  async function handleMessage(msg) {
-    const chatId = msg.chat && msg.chat.id;
-    const userId = msg.from && msg.from.id;
-    const text = msg.text || '';
+  async function handleMessage(ctx) {
+    const chatId = ctx.chat && ctx.chat.id;
+    const userId = ctx.from && ctx.from.id;
+    const text = ctx.message && ctx.message.text || '';
 
     // Chat whitelist check
     if (allowed_chat_ids.length > 0 && !allowed_chat_ids.map(String).includes(String(chatId))) {
       return;
     }
 
-    // User whitelist check (empty = allow all)
+    // User whitelist check
     if (allowed_user_ids.length > 0 && !allowed_user_ids.map(String).includes(String(userId))) {
       return;
     }
 
-    // Extract prompt: strip /claude prefix if present
+    // Strip /claude prefix if present
     let rawPrompt = text.replace(/^\/claude\s*/i, '').trim();
     if (!rawPrompt) return;
 
     const { safe: prompt } = sanitize(rawPrompt);
     if (!prompt.trim()) return;
 
-    let processingMsgId;
+    let processingMsg;
     try {
-      const sent = await bot.sendMessage(chatId, '⏳ 處理中...');
-      processingMsgId = sent.message_id;
+      processingMsg = await ctx.reply('⏳ 處理中...');
     } catch (err) {
       console.error('[telegram] Failed to send processing message:', err);
       return;
@@ -71,45 +68,37 @@ async function start(config) {
 
     // Edit the processing placeholder with the first chunk
     try {
-      await bot.editMessageText(chunks[0], {
-        chat_id: chatId,
-        message_id: processingMsgId,
-      });
+      await ctx.api.editMessageText(chatId, processingMsg.message_id, chunks[0]);
     } catch (err) {
       console.error('[telegram] Failed to edit processing message:', err);
     }
 
-    // Send remaining chunks as new messages
+    // Send remaining chunks
     for (let i = 1; i < chunks.length; i++) {
       try {
-        await bot.sendMessage(chatId, chunks[i]);
+        await ctx.reply(chunks[i]);
       } catch (err) {
         console.error(`[telegram] Failed to send chunk ${i}:`, err);
       }
     }
   }
 
-  // Listen to regular text messages (private chats only)
-  bot.on('message', (msg) => {
-    if (msg.chat.type !== 'private') return;
-    if (!msg.text) return;
-    // Skip /claude command messages — handled by onText below
-    if (/^\/claude(\s|$)/i.test(msg.text)) return;
-    handleMessage(msg);
+  // Handle /claude command
+  bot.command('claude', (ctx) => handleMessage(ctx));
+
+  // Handle plain messages in private chats
+  bot.on('message:text', (ctx) => {
+    if (ctx.chat.type !== 'private') return;
+    if (/^\/claude(\s|$)/i.test(ctx.message.text)) return; // handled by command
+    handleMessage(ctx);
   });
 
-  // Listen to /claude command specifically
-  bot.onText(/^\/claude(\s|$)/i, (msg) => {
-    handleMessage(msg);
+  bot.catch((err) => {
+    console.error('[telegram] Bot error:', err.message || err);
   });
 
-  bot.on('polling_error', (err) => {
-    console.error('[telegram] Polling error:', err.message || err);
-  });
-
-  bot.on('error', (err) => {
-    console.error('[telegram] Bot error:', err);
-  });
+  await bot.start({ drop_pending_updates: true });
+  console.log('[telegram] Bot started (long polling).');
 
   return bot;
 }

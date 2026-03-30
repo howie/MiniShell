@@ -88,6 +88,46 @@ if [[ $HAS_CLAW -eq 1 ]]; then
   fi
 fi
 
+# ── Ollama 推理驗證 ───────────────────────────────────────────────────────────
+echo ""
+echo "── Ollama 推理驗證 ──────────────────────────────────"
+
+# 確認 Host 端 Ollama 在執行
+if curl -sf http://localhost:11434/api/tags &>/dev/null; then
+  pass "Host 端 Ollama 在線（localhost:11434）"
+  OLLAMA_RUNNING=1
+else
+  warn "Host 端 Ollama 未在執行，略過 sandbox 連線測試"
+  OLLAMA_RUNNING=0
+fi
+
+if [[ $OLLAMA_RUNNING -eq 1 && $HAS_CLAW -eq 1 ]]; then
+  # claw-agent 應能連到 Ollama（透過 inference.local 或直連）
+  CLAW_INFERENCE=$(openshell sandbox connect claw-agent -- \
+    bash -c "curl -sf https://inference.local/v1/models 2>/dev/null && echo ok || echo blocked" \
+    2>/dev/null || echo "error")
+
+  if [[ "$CLAW_INFERENCE" == "ok" ]]; then
+    pass "claw-agent 能透過 inference.local 連到推理後端"
+  else
+    warn "claw-agent 無法連到 inference.local（可能尚未設定 inference routing）"
+    warn "請執行 make setup-ollama 後再驗證"
+  fi
+
+  # claude-dev 不應能透過直連到 Ollama
+  if [[ $HAS_CLAUDE -eq 1 ]]; then
+    CLAUDE_OLLAMA=$(openshell sandbox connect claude-dev -- \
+      bash -c "curl -sf http://host.openshell.internal:11434/api/tags 2>/dev/null && echo ok || echo blocked" \
+      2>/dev/null || echo "error")
+
+    if [[ "$CLAUDE_OLLAMA" == "blocked" || "$CLAUDE_OLLAMA" == "error" ]]; then
+      pass "claude-dev 無法直連 Ollama（policy 有效）"
+    else
+      warn "claude-dev 可以直連 Ollama host（policy 可能需要加強）"
+    fi
+  fi
+fi
+
 # ── Gateway 狀態 ──────────────────────────────────────────────────────────────
 echo ""
 echo "── Gateway 狀態 ─────────────────────────────────────"

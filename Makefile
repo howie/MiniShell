@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 SCRIPTS := scripts
 
-.PHONY: help install install-base setup-claude setup-claw apply-policies verify setup-bridge status
+.PHONY: help install install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge status
 
 # 預設 target：顯示說明
 help:
@@ -14,6 +14,7 @@ help:
 	@echo "  make setup-claw       建立 OpenClaw sandbox"
 	@echo "  make apply-policies   套用 Policy YAML（policies/ 目錄）"
 	@echo "  make verify           驗證沙箱隔離"
+	@echo "  make setup-ollama     安裝本地 Ollama 並設定 inference routing（選配）"
 	@echo "  make setup-bridge     安裝 Messaging Bridge（選配：Discord/Telegram/Slack）"
 	@echo "  make status           查看目前 sandbox 狀態"
 	@echo ""
@@ -45,6 +46,11 @@ apply-policies:
 verify:
 	@chmod +x $(SCRIPTS)/verify.sh
 	@$(SCRIPTS)/verify.sh
+
+# 本地推理（選配）
+setup-ollama:
+	@chmod +x $(SCRIPTS)/setup-ollama.sh
+	@$(SCRIPTS)/setup-ollama.sh
 
 # Messaging Bridge（選配）
 setup-bridge:

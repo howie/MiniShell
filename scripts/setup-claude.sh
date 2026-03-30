@@ -25,7 +25,7 @@ fi
 # ── 建立 GitHub Provider ──────────────────────────────────────────────────────
 echo ""
 echo "── GitHub Provider（Claude Code 用）────────────────"
-if openshell provider list 2>/dev/null | grep -q "github-claude"; then
+if openshell provider list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "github-claude"; then
   info "Provider 'github-claude' 已存在，略過"
 else
   step "建立 github-claude provider"
@@ -50,7 +50,7 @@ fi
 # ── 建立 Sandbox ──────────────────────────────────────────────────────────────
 echo ""
 echo "── 建立 claude-dev sandbox ──────────────────────────"
-if openshell sandbox list 2>/dev/null | grep -q "claude-dev"; then
+if openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "claude-dev"; then
   info "Sandbox 'claude-dev' 已存在，略過"
 else
   step "建立 claude-dev sandbox..."
@@ -126,6 +126,19 @@ fi
 if ! grep -q "alias claude=" ~/.bashrc 2>/dev/null; then
   echo "alias claude='"'"'claude-sandbox'"'"'" >> ~/.bashrc
   echo "[init] claude alias 設定完成"
+fi
+
+# Git credential helper — 用 GITHUB_TOKEN 認證 HTTPS
+if ! git config --global credential.helper 2>/dev/null | grep -q "echo"; then
+  git config --global credential.helper '"'"'!f() { echo "username=x-access-token"; echo "password=$GITHUB_TOKEN"; }; f'"'"'
+  echo "[init] git credential helper 設定完成"
+fi
+
+# Git user config
+if ! git config --global user.name &>/dev/null; then
+  git config --global user.name "Claude Dev"
+  git config --global user.email "claude-dev@sandbox.local"
+  echo "[init] git user.name / user.email 設定完成"
 fi
 '
 
