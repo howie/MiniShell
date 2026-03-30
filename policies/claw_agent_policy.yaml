@@ -27,6 +27,10 @@ network_policies:
     name: ollama_local
     endpoints:
       - { host: host.docker.internal, port: 11434 }
+      - { host: host.openshell.internal, port: 11434 }
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }
 
   telegram:
     name: telegram
