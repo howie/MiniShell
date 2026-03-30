@@ -17,7 +17,7 @@ if ! command -v openshell &>/dev/null; then
   exit 1
 fi
 
-if ! openshell status 2>/dev/null | grep -q "Connected"; then
+if ! openshell status 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "Connected"; then
   echo "OpenShell Gateway 未在線，請先執行 openshell gateway start" >&2
   exit 1
 fi
@@ -25,7 +25,7 @@ fi
 # ── 建立 GitHub Provider（OpenClaw 用）────────────────────────────────────────
 echo ""
 echo "── GitHub Provider（OpenClaw 用）───────────────────"
-if openshell provider list 2>/dev/null | grep -q "github-claw"; then
+if openshell provider list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "github-claw"; then
   info "Provider 'github-claw' 已存在，略過"
 else
   step "建立 github-claw provider"
@@ -50,7 +50,7 @@ fi
 # ── 建立 Gemini Provider ──────────────────────────────────────────────────────
 echo ""
 echo "── Gemini Provider ──────────────────────────────────"
-if openshell provider list 2>/dev/null | grep -q "gemini-flash"; then
+if openshell provider list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "gemini-flash"; then
   info "Provider 'gemini-flash' 已存在，略過"
 else
   step "建立 gemini-flash provider"
@@ -75,7 +75,7 @@ fi
 # ── 建立 Sandbox ──────────────────────────────────────────────────────────────
 echo ""
 echo "── 建立 claw-agent sandbox ──────────────────────────"
-if openshell sandbox list 2>/dev/null | grep -q "claw-agent"; then
+if openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "claw-agent"; then
   info "Sandbox 'claw-agent' 已存在，略過"
 else
   step "建立 claw-agent sandbox..."
