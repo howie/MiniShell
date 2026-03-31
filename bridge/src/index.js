@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const CONFIG_PATH = '/sandbox/messaging-bridge/bridge.config.json';
+const CONFIG_PATH = process.env.BRIDGE_CONFIG_PATH || '/sandbox/messaging-bridge/bridge.config.json';
 
 async function main() {
   // Load configuration
@@ -28,7 +28,12 @@ async function main() {
   const results = await Promise.allSettled([
     discord.start(config.discord || {}).then((inst) => { instances.discord = inst; }),
     telegram.start(config.telegram || {}).then((inst) => { instances.telegram = inst; }),
-    slack.start(config.slack || {}).then((inst) => { instances.slack = inst; }),
+    slack.start(config.slack || {}).then((inst) => {
+      if (inst) {
+        instances.slack = inst.app;
+        instances.slackReceiver = inst.receiver;
+      }
+    }),
   ]);
 
   results.forEach((r, i) => {
@@ -38,8 +43,8 @@ async function main() {
     }
   });
 
-  // Check if at least one platform is active
-  const anyActive = Object.values(instances).some((inst) => inst != null);
+  // Check if at least one platform is active (exclude receiver — it's not a platform)
+  const anyActive = ['discord', 'telegram', 'slack'].some((k) => instances[k] != null);
   if (!anyActive) {
     console.error('[bridge] WARNING: No messaging platforms are enabled. Exiting.');
     process.exit(1);
@@ -50,6 +55,13 @@ async function main() {
   // Graceful shutdown handler
   async function shutdown(signal) {
     console.log(`[bridge] Received ${signal} — shutting down...`);
+
+    // Force-exit if graceful shutdown takes too long
+    const forceExitTimer = setTimeout(() => {
+      console.error('[bridge] Shutdown timed out — forcing exit.');
+      process.exit(1);
+    }, 5000);
+    forceExitTimer.unref();
 
     const shutdownTasks = [];
 
@@ -69,6 +81,13 @@ async function main() {
       );
     }
 
+    if (instances.slackReceiver) {
+      // Disconnect the SocketModeClient first to prevent auto-reconnect races
+      try {
+        await instances.slackReceiver.client.disconnect();
+      } catch (_) { /* best-effort */ }
+    }
+
     if (instances.slack) {
       shutdownTasks.push(
         instances.slack.stop().catch((e) =>
@@ -78,6 +97,7 @@ async function main() {
     }
 
     await Promise.allSettled(shutdownTasks);
+    clearTimeout(forceExitTimer);
     console.log('[bridge] Shutdown complete.');
     process.exit(0);
   }

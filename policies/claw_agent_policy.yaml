@@ -22,6 +22,9 @@ network_policies:
     endpoints:
       - { host: generativelanguage.googleapis.com, port: 443 }
       - { host: aistudio.google.com, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }
 
   ollama_local:
     name: ollama_local
@@ -36,31 +39,50 @@ network_policies:
     name: telegram
     endpoints:
       - { host: api.telegram.org, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }
 
   github:
     name: github
     endpoints:
       - { host: github.com, port: 443 }
       - { host: api.github.com, port: 443 }
+    binaries:
+      - { path: /usr/bin/git }
+      - { path: /usr/lib/git-core/git-remote-https }
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }
 
   web_search:
     name: web_search
     endpoints:
       - { host: api.search.brave.com, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }
 
   npm_registry:
     name: npm_registry
     endpoints:
       - { host: registry.npmjs.org, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/npm }
 
   discord:
     name: discord
     endpoints:
       - { host: discord.com, port: 443 }
       - { host: gateway.discord.gg, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }
 
   slack:
     name: slack
     endpoints:
       - { host: slack.com, port: 443 }
       - { host: wss-primary.slack.com, port: 443 }
+      - { host: wss-backup.slack.com, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }

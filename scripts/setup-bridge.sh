@@ -244,6 +244,32 @@ info "原始碼上傳完成"
 
 sandbox_exec "chmod +x /sandbox/messaging-bridge/start.sh"
 
+# ── 注入 Slack WebSocket 主機名稱解析（/etc/hosts）──────────────────────────────
+# Sandbox 的 Kubernetes CoreDNS 無法解析外部域名，而 HTTP CONNECT tunnel 會被
+# Policy Gateway 在 ~15-20 秒後關閉。這裡從 host 解析 IP 後寫入 sandbox /etc/hosts，
+# 讓 WebSocket 可以直連 Slack 而不需要透過 proxy tunnel。
+step "注入 Slack WebSocket 主機名稱到 sandbox /etc/hosts..."
+SLACK_WSS_HOSTS=("wss-primary.slack.com" "wss-backup.slack.com")
+HOSTS_ENTRIES=""
+for host in "${SLACK_WSS_HOSTS[@]}"; do
+  # 從 host 機器解析 IP（取第一個 A record）
+  ip=$(node -e "const dns=require('dns'); dns.resolve4('${host}',(e,a)=>{ if(e){process.stderr.write(e.message+'\n');process.exit(1);} console.log(a[0]); })" 2>/dev/null || true)
+  if [[ -n "$ip" ]]; then
+    HOSTS_ENTRIES+="${ip}	${host}\n"
+    info "  ${host} → ${ip}"
+  else
+    warn "  無法解析 ${host}，跳過"
+  fi
+done
+if [[ -n "$HOSTS_ENTRIES" ]]; then
+  # 移除舊的 Slack WSS 記錄再新增
+  sandbox_exec "grep -v 'wss-.*\.slack\.com' /etc/hosts > /tmp/hosts.new && cat /tmp/hosts.new > /etc/hosts || true"
+  printf '%b' "$HOSTS_ENTRIES" | sandbox_exec "cat >> /etc/hosts"
+  info "/etc/hosts 注入完成"
+else
+  warn "未注入任何 Slack 主機名稱（DNS 解析全部失敗）"
+fi
+
 # ── 建立 bridge.config.json ────────────────────────────────────────────────────
 step "建立 bridge.config.json..."
 
@@ -302,8 +328,16 @@ npm_output="$(cd "$BRIDGE_DIR" && npm install --save-exact --no-progress 2>&1)" 
 printf '%s\n' "$npm_output" | tail -3
 info "npm install 完成"
 
+step "打包 node_modules（保留 symlink）..."
+NODE_MODULES_TAR="$TMPDIR/bridge-node-modules.tar.gz"
+tar -czf "$NODE_MODULES_TAR" -C "$BRIDGE_DIR" -h node_modules
+info "打包完成：$NODE_MODULES_TAR"
+
 step "上傳 node_modules 到 sandbox..."
-openshell sandbox upload "$SANDBOX_NAME" "$BRIDGE_DIR/node_modules" /sandbox/messaging-bridge/node_modules
+sandbox_exec 'rm -rf /sandbox/messaging-bridge/node_modules'
+openshell sandbox upload "$SANDBOX_NAME" "$NODE_MODULES_TAR" /tmp/
+sandbox_exec 'cd /sandbox/messaging-bridge && tar -xzf /tmp/bridge-node-modules.tar.gz && rm /tmp/bridge-node-modules.tar.gz'
+rm -f "$NODE_MODULES_TAR"
 info "node_modules 上傳完成"
 
 # ── 啟動 bridge ───────────────────────────────────────────────────────────────
