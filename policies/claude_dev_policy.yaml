@@ -222,6 +222,11 @@ network_policies:
     endpoints:
       - { host: slack.com, port: 443 }
       - { host: api.slack.com, port: 443 }
-      - { host: wss-primary.slack.com, port: 443 }
+      - host: wss-primary.slack.com
+        port: 443
+        tls: passthrough
+      - host: wss-backup.slack.com
+        port: 443
+        tls: passthrough
     binaries:
       - { path: /usr/bin/node }

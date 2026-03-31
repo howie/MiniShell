@@ -1,7 +1,5 @@
 'use strict';
 
-const { App } = require('@slack/bolt');
-const { HttpsProxyAgent } = require('https-proxy-agent');
 const { execute } = require('../executor');
 const { sanitize } = require('../utils/sanitize');
 const { chunk } = require('../utils/chunker');
@@ -17,6 +15,9 @@ async function start(config) {
     console.log('[slack] Disabled or no token — skipping.');
     return null;
   }
+
+  const { App } = require('@slack/bolt');
+  const { HttpsProxyAgent } = require('https-proxy-agent');
 
   const {
     bot_token,
@@ -43,11 +44,27 @@ async function start(config) {
     }
   }
 
-  const app = new App({
-    token: bot_token,
+  const { SocketModeReceiver } = require('@slack/bolt');
+
+  const receiver = new SocketModeReceiver({
     appToken: app_token,
     signingSecret: signing_secret,
-    socketMode: true,
+    installerOptions: {
+      clientOptions: agent ? { agent } : undefined,
+    },
+  });
+
+  // Increase ping timeouts for sandbox proxy environments where default 5s is too aggressive
+  receiver.client.clientPingTimeoutMillis = 30000;
+  receiver.client.serverPingTimeoutMillis = 60000;
+
+  receiver.client.on('connected', () => console.log('[slack] WebSocket connected'));
+  receiver.client.on('disconnected', () => console.log('[slack] WebSocket disconnected'));
+  receiver.client.on('reconnecting', () => console.log('[slack] WebSocket reconnecting...'));
+
+  const app = new App({
+    token: bot_token,
+    receiver,
     agent,
   });
 
@@ -151,7 +168,7 @@ async function start(config) {
   await app.start();
   console.log('[slack] App started (Socket Mode).');
 
-  return app;
+  return { app, receiver };
 }
 
 module.exports = { start };

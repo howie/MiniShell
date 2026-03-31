@@ -3,11 +3,15 @@
 const { spawn } = require('child_process');
 
 const CLAUDE_BIN = '/sandbox/.local/bin/claude-sandbox';
+const SSH_HOST = process.env.BRIDGE_SSH_HOST; // set to run claude via SSH (e.g. 'openshell-claude-dev')
 const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024; // 2MB
 
 /**
- * Execute a prompt via the claude-sandbox binary.
+ * Execute a prompt via the claude-sandbox binary (local or via SSH).
+ *
+ * When BRIDGE_SSH_HOST is set, spawns: ssh <host> <CLAUDE_BIN> -p <prompt> --output-format text
+ * Otherwise spawns the binary directly (sandbox-local mode).
  *
  * @param {string} prompt - The user prompt to pass to Claude.
  * @param {function(string): void} onChunk - Streaming callback; called with
@@ -19,11 +23,18 @@ async function execute(prompt, onChunk, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const startTime = Date.now();
 
   return new Promise((resolve) => {
-    const args = ['-p', prompt, '--output-format', 'text'];
+    let cmd, args;
+    if (SSH_HOST) {
+      cmd = 'ssh';
+      args = [SSH_HOST, CLAUDE_BIN, '-p', prompt, '--output-format', 'text'];
+    } else {
+      cmd = CLAUDE_BIN;
+      args = ['-p', prompt, '--output-format', 'text'];
+    }
 
     let child;
     try {
-      child = spawn(CLAUDE_BIN, args, {
+      child = spawn(cmd, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch (err) {

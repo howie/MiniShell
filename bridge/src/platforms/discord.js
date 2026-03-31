@@ -1,6 +1,5 @@
 'use strict';
 
-const { Client, GatewayIntentBits } = require('discord.js');
 const { execute } = require('../executor');
 const { sanitize } = require('../utils/sanitize');
 const { chunk } = require('../utils/chunker');
@@ -16,6 +15,8 @@ async function start(config) {
     console.log('[discord] Disabled or no token — skipping.');
     return null;
   }
+
+  const { Client, GatewayIntentBits } = require('discord.js');
 
   const {
     token,

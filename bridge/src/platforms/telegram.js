@@ -1,7 +1,5 @@
 'use strict';
 
-const { Bot } = require('grammy');
-const { HttpsProxyAgent } = require('https-proxy-agent');
 const { execute } = require('../executor');
 const { sanitize } = require('../utils/sanitize');
 const { chunk } = require('../utils/chunker');
@@ -17,6 +15,9 @@ async function start(config) {
     console.log('[telegram] Disabled or no token — skipping.');
     return null;
   }
+
+  const { Bot } = require('grammy');
+  const { HttpsProxyAgent } = require('https-proxy-agent');
 
   const {
     token,
