@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+const telegramChunkRunes = 4000
 
 var claudePrefixRe = regexp.MustCompile(`(?i)^/claude\s*`)
 
@@ -16,6 +20,7 @@ type Telegram struct {
 	cfg  TelegramConfig
 	exec ExecutorConfig
 	log  *slog.Logger
+	wg   sync.WaitGroup
 }
 
 func NewTelegram(cfg TelegramConfig, exec ExecutorConfig) *Telegram {
@@ -35,6 +40,9 @@ func (t *Telegram) Run(ctx context.Context) error {
 	u.Timeout = 30
 	updates := bot.GetUpdatesChan(u)
 
+	// Wait for all in-flight handlers before returning.
+	defer t.wg.Wait()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -47,7 +55,17 @@ func (t *Telegram) Run(ctx context.Context) error {
 			if update.Message == nil {
 				continue
 			}
-			go t.handleMessage(ctx, bot, update.Message)
+			msg := update.Message
+			t.wg.Add(1)
+			go func() {
+				defer t.wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						t.log.Error("handler panic", "recover", r)
+					}
+				}()
+				t.handleMessage(ctx, bot, msg)
+			}()
 		}
 	}
 }
@@ -66,11 +84,11 @@ func (t *Telegram) handleMessage(ctx context.Context, bot *tgbotapi.BotAPI, msg 
 	userID := msg.From.ID
 
 	// Chat whitelist
-	if len(t.cfg.AllowedChatIDs) > 0 && !containsStr(t.cfg.AllowedChatIDs, fmt.Sprint(chatID)) {
+	if len(t.cfg.AllowedChatIDs) > 0 && !slices.Contains(t.cfg.AllowedChatIDs, fmt.Sprint(chatID)) {
 		return
 	}
 	// User whitelist
-	if len(t.cfg.AllowedUserIDs) > 0 && !containsStr(t.cfg.AllowedUserIDs, fmt.Sprint(userID)) {
+	if len(t.cfg.AllowedUserIDs) > 0 && !slices.Contains(t.cfg.AllowedUserIDs, fmt.Sprint(userID)) {
 		return
 	}
 
@@ -89,10 +107,15 @@ func (t *Telegram) handleMessage(ctx context.Context, bot *tgbotapi.BotAPI, msg 
 		return
 	}
 
-	prompt, _ := Sanitize(rawPrompt, 0)
-	prompt = strings.TrimSpace(prompt)
+	prompt, truncated := sanitizePrompt(rawPrompt)
 	if prompt == "" {
 		return
+	}
+
+	// Notify user if prompt was truncated before processing.
+	if truncated {
+		notice := tgbotapi.NewMessage(chatID, "⚠️ 您的訊息過長，已截斷至 10,000 字元。")
+		_, _ = bot.Send(notice)
 	}
 
 	// Send placeholder
@@ -105,7 +128,7 @@ func (t *Telegram) handleMessage(ctx context.Context, bot *tgbotapi.BotAPI, msg 
 
 	result := Execute(ctx, t.exec, prompt)
 	output := result.FormatForDisplay()
-	chunks := Chunk(output, 4000)
+	chunks := Chunk(output, telegramChunkRunes)
 
 	// Edit placeholder with first chunk
 	edit := tgbotapi.NewEditMessageText(chatID, sent.MessageID, chunks[0])

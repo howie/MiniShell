@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -49,17 +50,27 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
+	// Force-exit if platforms don't stop within 10s after shutdown signal.
+	go func() {
+		<-ctx.Done()
+		time.AfterFunc(10*time.Second, func() {
+			slog.Error("shutdown timed out — forcing exit")
+			os.Exit(1)
+		})
+	}()
+
 	var wg sync.WaitGroup
 	for _, p := range platforms {
 		wg.Add(1)
-		go func(p Platform) {
+		go func() {
 			defer wg.Done()
 			slog.Info("starting platform", "platform", p.Name())
 			if err := p.Run(ctx); err != nil && ctx.Err() == nil {
 				slog.Error("platform exited with error", "platform", p.Name(), "err", err)
+				stop() // cascade shutdown to other platforms
 			}
 			slog.Info("platform stopped", "platform", p.Name())
-		}(p)
+		}()
 	}
 
 	slog.Info("bridge running", "platforms", len(platforms))

@@ -92,7 +92,7 @@ func Execute(ctx context.Context, cfg ExecutorConfig, prompt string) ExecResult 
 	waitErr := cmd.Wait()
 	duration := time.Since(start).Milliseconds()
 
-	timedOut := ctx.Err() != nil
+	timedOut := ctx.Err() == context.DeadlineExceeded
 
 	if stderrBuf.Len() > 0 {
 		if waitErr != nil {

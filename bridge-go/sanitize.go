@@ -2,6 +2,14 @@ package main
 
 import "strings"
 
+// sanitizePrompt strips invisible chars, trims whitespace, and returns the
+// cleaned prompt along with whether it was truncated to the 10k-rune limit.
+func sanitizePrompt(raw string) (prompt string, truncated bool) {
+	prompt, truncated = Sanitize(raw, 0)
+	prompt = strings.TrimSpace(prompt)
+	return
+}
+
 const defaultMaxRunes = 10_000
 
 // Sanitize strips invisible/zero-width Unicode characters and NUL bytes from

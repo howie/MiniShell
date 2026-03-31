@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
 )
+
+const slackChunkRunes = 2900
 
 var slackMentionRe = regexp.MustCompile(`<@[A-Z0-9]+>`)
 
@@ -18,6 +22,7 @@ type Slack struct {
 	cfg  SlackConfig
 	exec ExecutorConfig
 	log  *slog.Logger
+	wg   sync.WaitGroup
 }
 
 func NewSlack(cfg SlackConfig, exec ExecutorConfig) *Slack {
@@ -48,6 +53,9 @@ func (sl *Slack) Run(ctx context.Context) error {
 
 	sl.log.Info("bot started")
 
+	// Wait for in-flight handlers before returning.
+	defer sl.wg.Wait()
+
 	for {
 		select {
 		case err := <-runErr:
@@ -77,7 +85,16 @@ func (sl *Slack) Run(ctx context.Context) error {
 				if !ok {
 					continue
 				}
-				go sl.handleEventsAPI(ctx, api, eventsAPIEvent)
+				sl.wg.Add(1)
+				go func() {
+					defer sl.wg.Done()
+					defer func() {
+						if r := recover(); r != nil {
+							sl.log.Error("handler panic", "recover", r)
+						}
+					}()
+					sl.handleEventsAPI(ctx, api, eventsAPIEvent)
+				}()
 			}
 		}
 	}
@@ -89,6 +106,7 @@ func (sl *Slack) handleEventsAPI(ctx context.Context, api *slack.Client, event s
 	}
 
 	var channelID, userID, text string
+	isDM := false
 
 	switch ev := event.InnerEvent.Data.(type) {
 	case *slackevents.AppMentionEvent:
@@ -102,6 +120,7 @@ func (sl *Slack) handleEventsAPI(ctx context.Context, api *slack.Client, event s
 		if ev.ChannelType != "im" {
 			return
 		}
+		isDM = true
 		channelID = ev.Channel
 		userID = ev.User
 		text = ev.Text
@@ -109,12 +128,12 @@ func (sl *Slack) handleEventsAPI(ctx context.Context, api *slack.Client, event s
 		return
 	}
 
-	// Channel whitelist (skipped for DMs — channelID is the DM channel, not a public channel)
-	if len(sl.cfg.AllowedChannelIDs) > 0 && !containsStr(sl.cfg.AllowedChannelIDs, channelID) {
+	// Channel whitelist — skip for DMs (channelID is the DM channel, not a public channel ID)
+	if !isDM && len(sl.cfg.AllowedChannelIDs) > 0 && !slices.Contains(sl.cfg.AllowedChannelIDs, channelID) {
 		return
 	}
 	// User whitelist
-	if len(sl.cfg.AllowedUserIDs) > 0 && !containsStr(sl.cfg.AllowedUserIDs, userID) {
+	if len(sl.cfg.AllowedUserIDs) > 0 && !slices.Contains(sl.cfg.AllowedUserIDs, userID) {
 		return
 	}
 
@@ -125,10 +144,16 @@ func (sl *Slack) handleEventsAPI(ctx context.Context, api *slack.Client, event s
 		return
 	}
 
-	prompt, _ := Sanitize(rawPrompt, 0)
-	prompt = strings.TrimSpace(prompt)
+	prompt, truncated := sanitizePrompt(rawPrompt)
 	if prompt == "" {
 		return
+	}
+
+	// Notify user if prompt was truncated before processing.
+	if truncated {
+		if _, _, err := api.PostMessage(channelID, slack.MsgOptionText("⚠️ 您的訊息過長，已截斷至 10,000 字元。", false)); err != nil {
+			sl.log.Error("send truncation notice failed", "err", err)
+		}
 	}
 
 	// Send placeholder
@@ -140,7 +165,7 @@ func (sl *Slack) handleEventsAPI(ctx context.Context, api *slack.Client, event s
 
 	result := Execute(ctx, sl.exec, prompt)
 	output := result.FormatForDisplay()
-	chunks := Chunk(output, 2900)
+	chunks := Chunk(output, slackChunkRunes)
 
 	// Update placeholder with first chunk
 	_, _, _, err = api.UpdateMessage(channelID, placeholderTS, slack.MsgOptionText(chunks[0], false))

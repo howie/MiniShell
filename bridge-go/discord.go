@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
 
 	"github.com/bwmarrin/discordgo"
 )
+
+const discordChunkRunes = 1990
 
 var mentionRe = regexp.MustCompile(`<@!?[0-9]+>`)
 
@@ -16,6 +20,7 @@ type Discord struct {
 	cfg  DiscordConfig
 	exec ExecutorConfig
 	log  *slog.Logger
+	wg   sync.WaitGroup
 }
 
 func NewDiscord(cfg DiscordConfig, exec ExecutorConfig) *Discord {
@@ -36,6 +41,13 @@ func (d *Discord) Run(ctx context.Context) error {
 	session.ShouldReconnectOnError = true
 
 	session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
+		d.wg.Add(1)
+		defer d.wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				d.log.Error("handler panic", "recover", r)
+			}
+		}()
 		d.handleMessage(ctx, s, m)
 	})
 	session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
@@ -45,6 +57,8 @@ func (d *Discord) Run(ctx context.Context) error {
 	if err := session.Open(); err != nil {
 		return fmt.Errorf("open session: %w", err)
 	}
+	// Wait for in-flight handlers before closing the session.
+	defer d.wg.Wait()
 	defer session.Close()
 
 	d.log.Info("bot started")
@@ -64,11 +78,11 @@ func (d *Discord) handleMessage(ctx context.Context, s *discordgo.Session, m *di
 	}
 
 	// Channel whitelist
-	if len(d.cfg.AllowedChannelIDs) > 0 && !containsStr(d.cfg.AllowedChannelIDs, m.ChannelID) {
+	if len(d.cfg.AllowedChannelIDs) > 0 && !slices.Contains(d.cfg.AllowedChannelIDs, m.ChannelID) {
 		return
 	}
 	// User whitelist
-	if len(d.cfg.AllowedUserIDs) > 0 && !containsStr(d.cfg.AllowedUserIDs, m.Author.ID) {
+	if len(d.cfg.AllowedUserIDs) > 0 && !slices.Contains(d.cfg.AllowedUserIDs, m.Author.ID) {
 		return
 	}
 
@@ -93,10 +107,16 @@ func (d *Discord) handleMessage(ctx context.Context, s *discordgo.Session, m *di
 		return
 	}
 
-	prompt, _ := Sanitize(rawPrompt, 0)
-	prompt = strings.TrimSpace(prompt)
+	prompt, truncated := sanitizePrompt(rawPrompt)
 	if prompt == "" {
 		return
+	}
+
+	// Notify user if prompt was truncated before processing.
+	if truncated {
+		if _, err := s.ChannelMessageSend(m.ChannelID, "⚠️ 您的訊息過長，已截斷至 10,000 字元。"); err != nil {
+			d.log.Error("send truncation notice failed", "err", err)
+		}
 	}
 
 	// Send placeholder
@@ -108,7 +128,7 @@ func (d *Discord) handleMessage(ctx context.Context, s *discordgo.Session, m *di
 
 	result := Execute(ctx, d.exec, prompt)
 	output := result.FormatForDisplay()
-	chunks := Chunk(output, 1990)
+	chunks := Chunk(output, discordChunkRunes)
 
 	// Edit placeholder with first chunk
 	edit := &discordgo.MessageEdit{
