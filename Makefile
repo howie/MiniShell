@@ -1,14 +1,15 @@
 SHELL := /bin/bash
 SCRIPTS := scripts
 
-.PHONY: help install install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge status
+.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge status
 
 # 預設 target：顯示說明
 help:
 	@echo ""
 	@echo "OpenShell 雙 Sandbox 環境管理"
 	@echo ""
-	@echo "  make install          完整安裝（base → claude → claw → policies → verify）"
+	@echo "  make install          完整安裝（host → base → claude → claw → policies → verify）"
+	@echo "  make setup-host       主機優化（防火牆、TCP Keepalive、Power Nap）"
 	@echo "  make install-base     安裝基礎環境（Homebrew、工具、OrbStack、OpenShell）"
 	@echo "  make setup-claude     建立 Claude Code sandbox"
 	@echo "  make setup-claw       建立 OpenClaw sandbox"
@@ -20,7 +21,12 @@ help:
 	@echo ""
 
 # 完整安裝
-install: install-base setup-claude setup-claw apply-policies verify
+install: setup-host install-base setup-claude setup-claw apply-policies verify
+
+# Phase 0：主機層級優化
+setup-host:
+	@chmod +x $(SCRIPTS)/setup-host.sh
+	@$(SCRIPTS)/setup-host.sh
 
 # Phase 1~3：基礎環境
 install-base:
