@@ -148,6 +148,7 @@ network_policies:
       - { path: /usr/bin/npm }
       - { path: /usr/bin/npx }
       - { path: /usr/bin/yarn }
+      - { path: /sandbox/.local/bin/bun }
 
   nvidia_inference:
     name: nvidia-inference
@@ -209,6 +210,7 @@ network_policies:
       - { host: gateway.discord.gg, port: 443 }
     binaries:
       - { path: /usr/bin/node }
+      - { path: /sandbox/messaging-bridge/bridge-go-v2 }
 
   messaging_telegram:
     name: messaging-telegram
@@ -216,6 +218,7 @@ network_policies:
       - { host: api.telegram.org, port: 443 }
     binaries:
       - { path: /usr/bin/node }
+      - { path: /sandbox/messaging-bridge/bridge-go-v2 }
 
   messaging_slack:
     name: messaging-slack
@@ -230,3 +233,4 @@ network_policies:
         tls: passthrough
     binaries:
       - { path: /usr/bin/node }
+      - { path: /sandbox/messaging-bridge/bridge-go-v2 }

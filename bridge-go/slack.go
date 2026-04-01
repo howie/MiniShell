@@ -164,6 +164,7 @@ func (sl *Slack) handleEventsAPI(ctx context.Context, api *slack.Client, event s
 	}
 
 	result := Execute(ctx, sl.exec, prompt)
+	sl.log.Info("execution complete", "duration_ms", result.DurationMs, "success", result.Success, "timed_out", result.TimedOut)
 	output := result.FormatForDisplay()
 	chunks := Chunk(output, slackChunkRunes)
 

@@ -37,7 +37,7 @@ func (t *Telegram) Run(ctx context.Context) error {
 	t.log.Info("bot started", "username", bot.Self.UserName)
 
 	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 30
+	u.Timeout = 10 // proxy tunnel terminates at ~15-20s; keep below that
 	updates := bot.GetUpdatesChan(u)
 
 	// Wait for all in-flight handlers before returning.
@@ -127,6 +127,7 @@ func (t *Telegram) handleMessage(ctx context.Context, bot *tgbotapi.BotAPI, msg 
 	}
 
 	result := Execute(ctx, t.exec, prompt)
+	t.log.Info("execution complete", "duration_ms", result.DurationMs, "success", result.Success, "timed_out", result.TimedOut)
 	output := result.FormatForDisplay()
 	chunks := Chunk(output, telegramChunkRunes)
 
