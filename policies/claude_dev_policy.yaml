@@ -45,6 +45,8 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      # claude-runner: renamed copy of claude that bypasses openshell's --trust injection
+      # claude-runner: renamed copy of claude that bypasses openshell's --trust injection
       - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/node }
@@ -59,6 +61,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      # claude-runner: renamed copy of claude that bypasses openshell's --trust injection
       - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/node }
@@ -72,6 +75,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      # claude-runner: renamed copy of claude that bypasses openshell's --trust injection
       - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/node }
@@ -114,6 +118,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      # claude-runner: renamed copy of claude that bypasses openshell's --trust injection
       - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/gh }
@@ -147,6 +152,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      # claude-runner: renamed copy of claude that bypasses openshell's --trust injection
       - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/node }

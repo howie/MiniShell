@@ -15,13 +15,19 @@ SINCE="${2:-10m}"
 echo -e "${BOLD}Telegram Channels 延遲分析 — sandbox: $SANDBOX, 最近 $SINCE${NC}"
 echo "────────────────────────────────────────────────────────"
 
-# 擷取所有相關連線並排序
-raw=$(openshell logs "$SANDBOX" --since "$SINCE" 2>&1 \
+# 擷取 logs（分開執行以便偵測 openshell 本身失敗）
+if ! log_output=$(openshell logs "$SANDBOX" --since "$SINCE" 2>&1); then
+  echo "錯誤：openshell logs 指令失敗（sandbox: $SANDBOX）" >&2
+  echo "$log_output" >&2
+  exit 1
+fi
+
+raw=$(echo "$log_output" \
   | grep "action=allow" \
   | grep -E "dst_host=(api\.telegram\.org|api\.anthropic\.com|mcp-proxy\.anthropic\.com)" \
   | grep -oE '\[([0-9]+\.[0-9]+)\].*dst_host=([^ ]+)' \
   | sed 's/\[\([0-9.]*\)\].*dst_host=\([^ ]*\)/\1 \2/' \
-  | sort -n)
+  | sort -n || true)
 
 if [[ -z "$raw" ]]; then
   echo "無資料（$SINCE 內無 allow 記錄）"

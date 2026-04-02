@@ -32,64 +32,72 @@ echo "── A. Application Firewall ──────────────�
 
 FIREWALL_BIN="/usr/libexec/ApplicationFirewall/socketfilterfw"
 
-FIREWALL_STATE=$(sudo "$FIREWALL_BIN" --getglobalstate 2>/dev/null || echo "")
-if echo "$FIREWALL_STATE" | grep -q "enabled"; then
-  info "Application Firewall 已啟用"
+if [[ ! -f "$FIREWALL_BIN" ]]; then
+  warn "找不到 $FIREWALL_BIN，略過防火牆設定"
+  FIREWALL_BIN=""
 else
-  warn "Application Firewall 未啟用，略過允許清單設定"
-fi
-
-# 找到需要加入的 binary 路徑
-BINARIES_TO_ADD=()
-
-# claude
-if [[ -f "/opt/homebrew/bin/claude" ]]; then
-  BINARIES_TO_ADD+=("/opt/homebrew/bin/claude")
-else
-  warn "找不到 /opt/homebrew/bin/claude，略過"
-fi
-
-# bun（支援 asdf / homebrew / 直接安裝）
-BUN_PATH=""
-if command -v asdf &>/dev/null && asdf which bun &>/dev/null 2>&1; then
-  BUN_PATH="$(asdf which bun 2>/dev/null)"
-elif [[ -f "/opt/homebrew/bin/bun" ]]; then
-  BUN_PATH="/opt/homebrew/bin/bun"
-elif command -v bun &>/dev/null; then
-  BUN_PATH="$(command -v bun)"
-fi
-if [[ -n "$BUN_PATH" ]]; then
-  BINARIES_TO_ADD+=("$BUN_PATH")
-else
-  warn "找不到 bun，略過"
-fi
-
-# node（支援 asdf / homebrew / 直接安裝）
-NODE_PATH=""
-if command -v asdf &>/dev/null && asdf which node &>/dev/null 2>&1; then
-  NODE_PATH="$(asdf which node 2>/dev/null)"
-elif [[ -f "/opt/homebrew/bin/node" ]]; then
-  NODE_PATH="/opt/homebrew/bin/node"
-elif command -v node &>/dev/null; then
-  NODE_PATH="$(command -v node)"
-fi
-if [[ -n "$NODE_PATH" ]]; then
-  BINARIES_TO_ADD+=("$NODE_PATH")
-else
-  warn "找不到 node，略過"
-fi
-
-# 加入防火牆允許清單（冪等：已存在則跳過）
-for bin in "${BINARIES_TO_ADD[@]}"; do
-  if sudo "$FIREWALL_BIN" --listapps 2>/dev/null | grep -qF "$bin"; then
-    info "$(basename "$bin") 已在允許清單"
+  FIREWALL_STATE=$(sudo "$FIREWALL_BIN" --getglobalstate 2>/dev/null || echo "")
+  if echo "$FIREWALL_STATE" | grep -q "enabled"; then
+    info "Application Firewall 已啟用"
   else
-    step "新增 $(basename "$bin") 到防火牆允許清單..."
-    sudo "$FIREWALL_BIN" --add "$bin" >/dev/null
-    sudo "$FIREWALL_BIN" --unblockapp "$bin" >/dev/null
-    info "$(basename "$bin") 已加入"
+    warn "Application Firewall 未啟用，略過允許清單設定"
+    FIREWALL_BIN=""
   fi
-done
+fi
+
+if [[ -n "$FIREWALL_BIN" ]]; then
+  # 找到需要加入的 binary 路徑
+  BINARIES_TO_ADD=()
+
+  # claude
+  if [[ -f "/opt/homebrew/bin/claude" ]]; then
+    BINARIES_TO_ADD+=("/opt/homebrew/bin/claude")
+  else
+    warn "找不到 /opt/homebrew/bin/claude，略過"
+  fi
+
+  # bun（支援 asdf / homebrew / 直接安裝）
+  BUN_PATH=""
+  if command -v asdf &>/dev/null && asdf which bun &>/dev/null 2>&1; then
+    BUN_PATH="$(asdf which bun 2>/dev/null)"
+  elif [[ -f "/opt/homebrew/bin/bun" ]]; then
+    BUN_PATH="/opt/homebrew/bin/bun"
+  elif command -v bun &>/dev/null; then
+    BUN_PATH="$(command -v bun)"
+  fi
+  if [[ -n "$BUN_PATH" ]]; then
+    BINARIES_TO_ADD+=("$BUN_PATH")
+  else
+    warn "找不到 bun，略過"
+  fi
+
+  # node（支援 asdf / homebrew / 直接安裝）
+  NODE_PATH=""
+  if command -v asdf &>/dev/null && asdf which node &>/dev/null 2>&1; then
+    NODE_PATH="$(asdf which node 2>/dev/null)"
+  elif [[ -f "/opt/homebrew/bin/node" ]]; then
+    NODE_PATH="/opt/homebrew/bin/node"
+  elif command -v node &>/dev/null; then
+    NODE_PATH="$(command -v node)"
+  fi
+  if [[ -n "$NODE_PATH" ]]; then
+    BINARIES_TO_ADD+=("$NODE_PATH")
+  else
+    warn "找不到 node，略過"
+  fi
+
+  # 加入防火牆允許清單（冪等：已存在則跳過）
+  for bin in "${BINARIES_TO_ADD[@]}"; do
+    if sudo "$FIREWALL_BIN" --listapps 2>/dev/null | grep -qF "$bin"; then
+      info "$(basename "$bin") 已在允許清單"
+    else
+      step "新增 $(basename "$bin") 到防火牆允許清單..."
+      sudo "$FIREWALL_BIN" --add "$bin" >/dev/null
+      sudo "$FIREWALL_BIN" --unblockapp "$bin" >/dev/null
+      info "$(basename "$bin") 已加入"
+    fi
+  done
+fi
 
 # ── B. TCP Keepalive ──────────────────────────────────
 echo ""
@@ -104,15 +112,31 @@ else
   info "TCP always_keepalive 已啟用（當前生效）"
 fi
 
-# 持久化到 /etc/sysctl.conf
-SYSCTL_CONF="/etc/sysctl.conf"
-KEEPALIVE_LINE="net.inet.tcp.always_keepalive=1"
-if [[ -f "$SYSCTL_CONF" ]] && grep -qF "$KEEPALIVE_LINE" "$SYSCTL_CONF"; then
-  info "TCP always_keepalive 已寫入 $SYSCTL_CONF"
+# 持久化：launchd plist（macOS 不讀 /etc/sysctl.conf，需用 LaunchDaemon）
+LAUNCHDAEMON_PLIST="/Library/LaunchDaemons/com.openshell.tcp-keepalive.plist"
+if [[ -f "$LAUNCHDAEMON_PLIST" ]]; then
+  info "TCP keepalive LaunchDaemon 已存在"
 else
-  step "寫入 $SYSCTL_CONF 使重開機後持續生效..."
-  echo "$KEEPALIVE_LINE" | sudo tee -a "$SYSCTL_CONF" >/dev/null
-  info "已寫入 $SYSCTL_CONF"
+  step "建立 LaunchDaemon 使重開機後持續生效..."
+  sudo tee "$LAUNCHDAEMON_PLIST" >/dev/null <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.openshell.tcp-keepalive</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/sbin/sysctl</string>
+        <string>-w</string>
+        <string>net.inet.tcp.always_keepalive=1</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+  info "已建立 $LAUNCHDAEMON_PLIST"
 fi
 
 # ── C. Power Nap ──────────────────────────────────────
@@ -145,7 +169,11 @@ fi
 echo ""
 echo "── 驗證結果 ─────────────────────────────────────"
 echo "  防火牆允許清單（claude/bun/node）："
-sudo "$FIREWALL_BIN" --listapps 2>/dev/null | grep -iE 'claude|bun|node' | sed 's/^/    /' || echo "    （無）"
+if [[ -n "$FIREWALL_BIN" ]]; then
+  sudo "$FIREWALL_BIN" --listapps 2>/dev/null | grep -iE 'claude|bun|node' | sed 's/^/    /' || echo "    （無符合項目）"
+else
+  echo "    （防火牆未啟用或不可用）"
+fi
 echo "  net.inet.tcp.always_keepalive：$(sysctl -n net.inet.tcp.always_keepalive)"
 echo "  powernap：$(pmset -g 2>/dev/null | awk '/powernap/{print $2}')"
 
