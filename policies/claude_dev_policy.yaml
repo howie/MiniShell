@@ -45,6 +45,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/node }
 
@@ -58,6 +59,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/node }
       - { path: /usr/bin/curl }
@@ -70,6 +72,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/node }
 
@@ -111,6 +114,7 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/gh }
 
@@ -143,11 +147,13 @@ network_policies:
     binaries:
       - { path: /usr/local/bin/claude }
       - { path: "/sandbox/.local/bin/claude" }
+      - { path: "/sandbox/.local/bin/claude-runner" }
       - { path: "/sandbox/.local/share/claude/versions/**" }
       - { path: /usr/bin/node }
       - { path: /usr/bin/npm }
       - { path: /usr/bin/npx }
       - { path: /usr/bin/yarn }
+      - { path: /sandbox/.local/bin/bun }
 
   nvidia_inference:
     name: nvidia-inference
@@ -216,6 +222,7 @@ network_policies:
       - { host: api.telegram.org, port: 443 }
     binaries:
       - { path: /usr/bin/node }
+      - { path: /sandbox/.local/bin/bun }
 
   messaging_slack:
     name: messaging-slack
