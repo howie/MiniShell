@@ -1,5 +1,5 @@
-#!/bin/bash
-# setup-bridge.sh — 在 claude-dev sandbox 內安裝並啟動 messaging bridge
+#\!/bin/bash
+# setup-bridge-go.sh — 在 claude-dev sandbox 內安裝 Go messaging bridge
 set -euo pipefail
 
 GREEN='\033[0;32m'
@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 info()  { echo -e "${GREEN}[✓]${NC} $1"; }
-warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
+warn()  { echo -e "${YELLOW}[\!]${NC} $1"; }
 step()  { echo -e "${BLUE}[→]${NC} $1"; }
 
 SANDBOX_NAME="claude-dev"
@@ -20,17 +20,17 @@ sandbox_exec() {
 }
 
 # ── 前置確認 ───────────────────────────────────────────────────────────────────
-if ! command -v openshell &>/dev/null; then
+if \! command -v openshell &>/dev/null; then
   echo "請先執行 make install-base" >&2
   exit 1
 fi
 
-if ! openshell status 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "Connected"; then
+if \! openshell status 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "Connected"; then
   echo "OpenShell Gateway 未在線，請先執行 openshell gateway start" >&2
   exit 1
 fi
 
-if ! openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "$SANDBOX_NAME"; then
+if \! openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "$SANDBOX_NAME"; then
   echo "Sandbox '${SANDBOX_NAME}' 不存在，請先執行 scripts/setup-claude.sh" >&2
   exit 1
 fi
@@ -38,7 +38,7 @@ fi
 info "前置確認通過"
 
 # ── 安裝 SSH config（若尚未存在）───────────────────────────────────────────────
-if ! grep -q "$SSH_HOST" ~/.ssh/config 2>/dev/null; then
+if \! grep -q "$SSH_HOST" ~/.ssh/config 2>/dev/null; then
   step "安裝 SSH config for ${SANDBOX_NAME}..."
   mkdir -p ~/.ssh
   echo "" >> ~/.ssh/config
@@ -50,7 +50,7 @@ fi
 
 # ── 測試 SSH 連線 ─────────────────────────────────────────────────────────────
 step "測試 SSH 連線..."
-if ! sandbox_exec "echo ok" &>/dev/null; then
+if \! sandbox_exec "echo ok" &>/dev/null; then
   echo "無法 SSH 連線到 ${SANDBOX_NAME}" >&2
   exit 1
 fi
@@ -80,10 +80,10 @@ if [ -f "$ENV_FILE" ]; then
     key="${line%%=*}"
     value="${line#*=}"
     # 去除前後空白（純 bash，避免 xargs 在空值時觸發 set -e）
-    key="${key#"${key%%[![:space:]]*}"}"
-    key="${key%"${key##*[![:space:]]}"}"
-    value="${value#"${value%%[![:space:]]*}"}"
-    value="${value%"${value##*[![:space:]]}"}"
+    key="${key#"${key%%[\![:space:]]*}"}"
+    key="${key%"${key##*[\![:space:]]}"}"
+    value="${value#"${value%%[\![:space:]]*}"}"
+    value="${value%"${value##*[\![:space:]]}"}"
     case "$key" in
       TELEGRAM_TOKEN)               TELEGRAM_TOKEN="$value" ;;
       SLACK_BOT_TOKEN)              SLACK_BOT_TOKEN="$value" ;;
@@ -211,38 +211,26 @@ if [[ "$SLACK_ENABLED" == "true" && -z "${SLACK_ALLOWED_USER_IDS_ENV:-}" ]]; the
   SLACK_ALLOWED_CHANNELS=$(ids_to_json_array "$_slack_channels")
 fi
 
-# ── 傳輸 bridge 原始碼 ────────────────────────────────────────────────────────
-BRIDGE_DIR="$(dirname "$SCRIPT_DIR")/bridge"
+# ── 傳輸 Go bridge binary ──────────────────────────────────────────────────────
+SCRIPT_DIR_PARENT="$(dirname "$SCRIPT_DIR")"
+BRIDGE_GO_BIN="${SCRIPT_DIR_PARENT}/bridge-go/bridge-go-linux"
 
-step "確認 bridge 原始碼存在..."
-REQUIRED_FILES=(
-  "$BRIDGE_DIR/package.json"
-  "$BRIDGE_DIR/start.sh"
-  "$BRIDGE_DIR/src/index.js"
-  "$BRIDGE_DIR/src/executor.js"
-  "$BRIDGE_DIR/src/platforms/discord.js"
-  "$BRIDGE_DIR/src/platforms/telegram.js"
-  "$BRIDGE_DIR/src/platforms/slack.js"
-  "$BRIDGE_DIR/src/utils/sanitize.js"
-  "$BRIDGE_DIR/src/utils/chunker.js"
-)
-for f in "${REQUIRED_FILES[@]}"; do
-  if [ ! -f "$f" ]; then
-    echo "缺少 bridge 原始碼：$f" >&2
-    exit 1
-  fi
-done
-info "Bridge 原始碼確認完成"
+step "確認 Go bridge binary 存在..."
+if [ \! -f "$BRIDGE_GO_BIN" ]; then
+  echo "缺少 Go bridge binary：$BRIDGE_GO_BIN" >&2
+  echo "請先編譯（cd bridge-go && GOOS=linux GOARCH=arm64 go build -o bridge-go-linux .）" >&2
+  exit 1
+fi
+info "Go bridge binary 確認完成（$(du -h "$BRIDGE_GO_BIN" | cut -f1)）"
 
 step "建立 sandbox 目錄結構..."
-sandbox_exec "mkdir -p /sandbox/messaging-bridge/src/platforms /sandbox/messaging-bridge/src/utils /sandbox/messaging-bridge/logs"
+sandbox_exec "mkdir -p /sandbox/messaging-bridge/logs"
 info "目錄結構建立完成"
 
-step "上傳 bridge 原始碼..."
-openshell sandbox upload "$SANDBOX_NAME" "$BRIDGE_DIR/" /sandbox/messaging-bridge
-info "原始碼上傳完成"
-
-sandbox_exec "chmod +x /sandbox/messaging-bridge/start.sh"
+step "上傳 Go bridge binary..."
+openshell sandbox upload "$SANDBOX_NAME" "$BRIDGE_GO_BIN" /sandbox/messaging-bridge/bridge-go
+sandbox_exec "chmod +x /sandbox/messaging-bridge/bridge-go"
+info "Binary 上傳完成"
 
 # ── 注入 Slack WebSocket 主機名稱解析（/etc/hosts）──────────────────────────────
 # Sandbox 的 Kubernetes CoreDNS 無法解析外部域名，而 HTTP CONNECT tunnel 會被
@@ -252,8 +240,7 @@ step "注入 Slack WebSocket 主機名稱到 sandbox /etc/hosts..."
 SLACK_WSS_HOSTS=("wss-primary.slack.com" "wss-backup.slack.com")
 HOSTS_ENTRIES=""
 for host in "${SLACK_WSS_HOSTS[@]}"; do
-  # 從 host 機器解析 IP（取第一個 A record）
-  ip=$(node -e "const dns=require('dns'); dns.resolve4('${host}',(e,a)=>{ if(e){process.stderr.write(e.message+'\n');process.exit(1);} console.log(a[0]); })" 2>/dev/null || true)
+  ip=$(python3 -c "import socket; print(socket.getaddrinfo('${host}', 443, socket.AF_INET)[0][4][0])" 2>/dev/null || true)
   if [[ -n "$ip" ]]; then
     HOSTS_ENTRIES+="${ip}	${host}\n"
     info "  ${host} → ${ip}"
@@ -262,7 +249,6 @@ for host in "${SLACK_WSS_HOSTS[@]}"; do
   fi
 done
 if [[ -n "$HOSTS_ENTRIES" ]]; then
-  # 移除舊的 Slack WSS 記錄再新增
   sandbox_exec "grep -v 'wss-.*\.slack\.com' /etc/hosts > /tmp/hosts.new && cat /tmp/hosts.new > /etc/hosts || true"
   printf '%b' "$HOSTS_ENTRIES" | sandbox_exec "cat >> /etc/hosts"
   info "/etc/hosts 注入完成"
@@ -296,7 +282,7 @@ CONFIG_JSON=$(cat <<CONFIGEOF
     "token": "${DISCORD_TOKEN_ESC}",
     "allowed_channel_ids": ${DISCORD_ALLOWED_CHANNELS},
     "allowed_user_ids": ${DISCORD_ALLOWED_USERS},
-    "command_prefix": "!claude "
+    "command_prefix": "\!claude "
   },
   "telegram": {
     "enabled": ${TELEGRAM_ENABLED},
@@ -318,41 +304,31 @@ CONFIGEOF
 echo "$CONFIG_JSON" | sandbox_exec "cat > /sandbox/messaging-bridge/bridge.config.json && chmod 600 /sandbox/messaging-bridge/bridge.config.json"
 info "bridge.config.json 建立完成（權限 600）"
 
-# ── npm install ────────────────────────────────────────────────────────────────
-step "在本機安裝 npm 依賴（繞過 sandbox proxy 限制）..."
-npm_output="$(cd "$BRIDGE_DIR" && npm install --save-exact --no-progress 2>&1)" || {
-  printf '%s\n' "$npm_output" | tail -30
-  echo "npm install 失敗，請確認 node/npm 版本與 package.json 內容" >&2
-  exit 1
-}
-printf '%s\n' "$npm_output" | tail -3
-info "npm install 完成"
-
-step "打包 node_modules（保留 symlink）..."
-NODE_MODULES_TAR="$TMPDIR/bridge-node-modules.tar.gz"
-tar -czf "$NODE_MODULES_TAR" -C "$BRIDGE_DIR" -h node_modules
-info "打包完成：$NODE_MODULES_TAR"
-
-step "上傳 node_modules 到 sandbox..."
-sandbox_exec 'rm -rf /sandbox/messaging-bridge/node_modules'
-openshell sandbox upload "$SANDBOX_NAME" "$NODE_MODULES_TAR" /tmp/
-sandbox_exec 'cd /sandbox/messaging-bridge && tar -xzf /tmp/bridge-node-modules.tar.gz && rm /tmp/bridge-node-modules.tar.gz'
-rm -f "$NODE_MODULES_TAR"
-info "node_modules 上傳完成"
-
-# ── 啟動 bridge ───────────────────────────────────────────────────────────────
-step "啟動 messaging bridge..."
-sandbox_exec 'cd /sandbox/messaging-bridge && if [ -f bridge.pid ] && kill -0 $(cat bridge.pid) 2>/dev/null; then echo "[bridge] 停止舊程序..."; kill $(cat bridge.pid); sleep 1; fi; bash start.sh'
+# ── 啟動 Go bridge ─────────────────────────────────────────────────────────────
+step "啟動 Go messaging bridge..."
+sandbox_exec 'cd /sandbox/messaging-bridge && \
+  if [ -f bridge.pid ] && kill -0 $(cat bridge.pid) 2>/dev/null; then \
+    echo "[bridge] 停止舊程序 (PID $(cat bridge.pid))..."; \
+    kill $(cat bridge.pid); sleep 1; \
+  fi; \
+  for pid in $(pgrep -f "node src/index.js" 2>/dev/null || true); do \
+    echo "[bridge] 停止殘留 Node.js bridge (PID $pid)..."; \
+    kill "$pid" 2>/dev/null || true; \
+  done; \
+  BRIDGE_CONFIG_PATH=/sandbox/messaging-bridge/bridge.config.json \
+  nohup ./bridge-go >> logs/bridge.log 2>&1 & \
+  echo $\! > bridge.pid'
 
 # 確認 bridge process 確實在執行
 sleep 2
-if ! sandbox_exec 'kill -0 $(cat /sandbox/messaging-bridge/bridge.pid 2>/dev/null) 2>/dev/null'; then
+if \! sandbox_exec 'kill -0 $(cat /sandbox/messaging-bridge/bridge.pid 2>/dev/null) 2>/dev/null'; then
   echo "Bridge 啟動失敗，最後 20 行 log：" >&2
   sandbox_exec 'tail -20 /sandbox/messaging-bridge/logs/bridge.log 2>/dev/null || echo "(log 不存在)"' >&2
   exit 1
 fi
-info "Bridge 已啟動！"
+info "Go Bridge 已啟動！"
 echo ""
 echo "  管理指令："
 echo "  ssh ${SSH_HOST} 'cat /sandbox/messaging-bridge/logs/bridge.log'"
 echo "  ssh ${SSH_HOST} 'kill \$(cat /sandbox/messaging-bridge/bridge.pid)'"
+echo ""
