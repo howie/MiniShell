@@ -4,6 +4,17 @@ set -euo pipefail
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+NC='\033[0m'
+warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+
+echo ""
+warn "此腳本已棄用，請改用：make setup-bridge（已自動指向 Go 版）"
+echo "   或直接執行：scripts/setup-bridge-go.sh"
+echo ""
+exit 1
+
+
+YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
