@@ -1,0 +1,57 @@
+---
+- name: 檢查 gateway 是否已在運行
+  ansible.builtin.shell:
+    cmd: "ss -tlnp 2>/dev/null | grep ':{{ gateway_port }}' || true"
+  register: gateway_listening
+  changed_when: false
+
+- name: 停止舊的 gateway 程序
+  ansible.builtin.shell:
+    # [o] 括號技巧：讓 pkill 不匹配自己的命令列，避免 rc=-15（SIGTERM 自殺）
+    cmd: "pkill -f '[o]penclaw gateway' || true"
+  changed_when: true
+  failed_when: false
+  when: gateway_listening.stdout != ""
+
+- name: 等待舊程序完全結束
+  ansible.builtin.wait_for:
+    timeout: 2
+  when: gateway_listening.stdout != ""
+
+- name: 啟動 gateway（setsid 脫離 pty，async 讓 SSH 斷線後程序存活）
+  ansible.builtin.shell:
+    # setsid：建立新 session，脫離 SSH pseudo-terminal，SSH 斷線後不收 SIGHUP
+    # async/poll:0：Ansible fire-and-forget，不等結果，不受 SSH session 生命週期影響
+    cmd: "setsid {{ gateway_binary }} gateway >> {{ gateway_log_path }} 2>&1 &"
+  async: 10
+  poll: 0
+  changed_when: true
+
+- name: 等待 gateway 啟動（最多 {{ gateway_start_timeout }} 秒）
+  ansible.builtin.shell:
+    # curl 優先，ss 備用（不同 container 環境工具可用性不同）
+    cmd: >
+      curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:{{ gateway_port }}/ 2>/dev/null | grep -qE '^[0-9]' ||
+      ss -tlnp 2>/dev/null | grep -q ':{{ gateway_port }}'
+  register: gateway_up
+  until: gateway_up.rc == 0
+  retries: "{{ gateway_start_retries }}"
+  delay: 2
+  changed_when: false
+
+- name: 顯示 gateway log（啟動失敗時診斷）
+  ansible.builtin.shell:
+    cmd: "tail -20 {{ gateway_log_path }} 2>/dev/null || echo '(log 不存在)'"
+  register: gateway_log
+  changed_when: false
+  when: gateway_up is failed
+
+- name: 輸出 gateway log
+  ansible.builtin.debug:
+    msg: "{{ gateway_log.stdout_lines }}"
+  when: gateway_up is failed
+
+- name: Gateway 已就緒
+  ansible.builtin.debug:
+    msg: "OpenClaw gateway 運行中（port {{ gateway_port }}）"
+  when: gateway_up is succeeded

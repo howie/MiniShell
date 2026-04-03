@@ -1,0 +1,64 @@
+---
+# 一鍵啟動 OpenClaw Dashboard 並開放 LAN 存取
+- name: 設定並啟動 OpenClaw Gateway
+  hosts: claw-agent
+  gather_facts: false
+
+  roles:
+    - role: ../roles/claw-gateway
+
+  post_tasks:
+    - name: 取得 dashboard token
+      ansible.builtin.shell:
+        cmd: "openclaw dashboard 2>/dev/null | grep 'token=' | head -1 | sed 's|.*#token=||'"
+      register: dashboard_token
+      changed_when: false
+      failed_when: false
+
+- name: 建立 LAN SSH Tunnel
+  hosts: mac-mini
+  gather_facts: false
+
+  vars:
+    tunnel_bind: "0.0.0.0"
+    tunnel_port: "{{ hostvars['claw-agent']['gateway_port'] | default(18789) }}"
+    lan_ip: "{{ hostvars['claw-agent']['lan_ip'] | default('192.168.1.29') }}"
+
+  tasks:
+    - name: 檢查 tunnel 是否已存在
+      ansible.builtin.shell:
+        cmd: "lsof -i :{{ tunnel_port }} | grep LISTEN | grep -v '127.0.0.1' || true"
+      register: tunnel_check
+      changed_when: false
+
+    - name: 停止舊的 tunnel
+      ansible.builtin.shell:
+        cmd: "lsof -ti :{{ tunnel_port }} | xargs kill -9 2>/dev/null || true"
+      changed_when: true
+      when: tunnel_check.stdout != ""
+
+    - name: 建立 SSH tunnel（LAN 暴露）
+      ansible.builtin.shell:
+        cmd: >
+          ssh -fN
+          -o StrictHostKeyChecking=no
+          -o UserKnownHostsFile=/dev/null
+          -o LogLevel=ERROR
+          -L {{ tunnel_bind }}:{{ tunnel_port }}:127.0.0.1:{{ tunnel_port }}
+          openshell-claw-agent
+      changed_when: true
+
+    - name: 等待 tunnel 就緒
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: "{{ tunnel_port }}"
+        timeout: 15
+
+    - name: 顯示 Dashboard 連線資訊
+      ansible.builtin.debug:
+        msg:
+          - "Dashboard 已開放 LAN 存取"
+          - "URL: http://{{ lan_ip }}:{{ tunnel_port }}/#token={{ hostvars['claw-agent']['dashboard_token']['stdout'] | default('<請從 sandbox 查詢 token>') }}"
+          - ""
+          - "查詢 token 指令："
+          - "  ssh openshell-claw-agent 'openclaw dashboard'"

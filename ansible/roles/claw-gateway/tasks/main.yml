@@ -1,0 +1,6 @@
+---
+- name: 設定 gateway config
+  ansible.builtin.import_tasks: config.yml
+
+- name: 啟動 gateway 服務
+  ansible.builtin.import_tasks: service.yml

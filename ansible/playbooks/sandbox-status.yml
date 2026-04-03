@@ -1,0 +1,77 @@
+---
+# 健康檢查：所有 sandbox 狀態
+- name: 健康檢查 - claw-agent
+  hosts: claw-agent
+  gather_facts: false
+
+  tasks:
+    - name: 檢查 SSH 連通
+      ansible.builtin.ping:
+
+    - name: 檢查 gateway port 監聽狀態
+      ansible.builtin.shell:
+        cmd: "ss -tlnp 2>/dev/null | grep ':{{ gateway_port }}' || echo '未監聽'"
+      register: port_status
+      changed_when: false
+
+    - name: 顯示 port 狀態
+      ansible.builtin.debug:
+        msg: "Gateway port {{ gateway_port }}: {{ port_status.stdout }}"
+
+    - name: 取得 gateway 健康狀態
+      ansible.builtin.command:
+        cmd: openclaw health
+      register: health_result
+      changed_when: false
+      failed_when: false
+
+    - name: 顯示 gateway 健康狀態
+      ansible.builtin.debug:
+        msg: "{{ health_result.stdout_lines | default(['(未回應)']) }}"
+
+    - name: 取得 dashboard 連線資訊
+      ansible.builtin.shell:
+        cmd: "openclaw dashboard 2>/dev/null | grep -E 'http|token' || echo '無法取得'"
+      register: dashboard_info
+      changed_when: false
+      failed_when: false
+
+    - name: 顯示 dashboard 資訊
+      ansible.builtin.debug:
+        msg: "{{ dashboard_info.stdout_lines }}"
+
+- name: 健康檢查 - claude-dev
+  hosts: claude-dev
+  gather_facts: false
+
+  tasks:
+    - name: 檢查 SSH 連通
+      ansible.builtin.ping:
+
+    - name: 顯示 Claude sandbox 狀態
+      ansible.builtin.debug:
+        msg: "claude-dev SSH 連通正常"
+
+- name: 健康檢查 - Mac Mini 本機 Tunnel
+  hosts: mac-mini
+  gather_facts: false
+
+  vars:
+    tunnel_port: 18789
+    lan_ip: "192.168.1.29"
+
+  tasks:
+    - name: 測試本機 tunnel HTTP 回應
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ tunnel_port }}/"
+        method: GET
+        status_code: [200, 301, 302, 401, 403]
+        timeout: 5
+      register: tunnel_http
+      failed_when: false
+
+    - name: 顯示 tunnel 狀態
+      ansible.builtin.debug:
+        msg: >
+          LAN tunnel http://{{ lan_ip }}:{{ tunnel_port }} →
+          {{ '正常 (HTTP ' + (tunnel_http.status | string) + ')' if tunnel_http.status is defined else '無回應（tunnel 未建立）' }}

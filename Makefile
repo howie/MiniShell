@@ -1,7 +1,8 @@
 SHELL := /bin/bash
 SCRIPTS := scripts
+ANSIBLE_PLAYBOOK := uvx --from ansible-core ansible-playbook
 
-.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go status
+.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go status dashboard gw-restart sandbox-check notebook-tunnel
 
 # 預設 target：顯示說明
 help:
@@ -18,6 +19,12 @@ help:
 	@echo "  make setup-ollama     安裝本地 Ollama + Gemma 4 e4b 並設定 inference routing"
 	@echo "  make setup-bridge     安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack）"
 	@echo "  make status           查看目前 sandbox 狀態"
+	@echo ""
+	@echo "Ansible 自動化："
+	@echo "  make dashboard        一鍵啟動 OpenClaw Dashboard（設定 config + gateway + LAN tunnel）"
+	@echo "  make notebook-tunnel  從筆電建立 SSH tunnel（解決 Secure Context，在筆電上執行）"
+	@echo "  make gw-restart       重啟 claw-agent gateway"
+	@echo "  make sandbox-check    健康檢查（所有 sandbox + tunnel）"
 	@echo ""
 
 # 完整安裝
@@ -64,6 +71,26 @@ setup-bridge: setup-bridge-go
 setup-bridge-go:
 	@chmod +x $(SCRIPTS)/setup-bridge-go.sh
 	@$(SCRIPTS)/setup-bridge-go.sh
+
+# Dashboard LAN 存取（Ansible）
+dashboard:
+	@echo "啟動 OpenClaw Dashboard（設定 config + gateway + LAN tunnel）..."
+	@cd ansible && $(ANSIBLE_PLAYBOOK) -i inventory.yml playbooks/claw-dashboard.yml
+
+# 筆電 localhost tunnel（解決 Secure Context，在筆電上執行）
+notebook-tunnel:
+	@chmod +x $(SCRIPTS)/notebook-tunnel.sh
+	@$(SCRIPTS)/notebook-tunnel.sh
+
+# 重啟 claw-agent gateway（Ansible）
+gw-restart:
+	@echo "重啟 OpenClaw Gateway..."
+	@cd ansible && $(ANSIBLE_PLAYBOOK) -i inventory.yml playbooks/claw-gateway.yml
+
+# Sandbox 健康檢查（Ansible）
+sandbox-check:
+	@echo "執行健康檢查..."
+	@cd ansible && $(ANSIBLE_PLAYBOOK) -i inventory.yml playbooks/sandbox-status.yml
 
 # 狀態查看
 status:

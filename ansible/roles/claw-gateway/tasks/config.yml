@@ -1,0 +1,31 @@
+---
+- name: 確認 openclaw config 檔案存在
+  ansible.builtin.stat:
+    path: "{{ gateway_config_path }}"
+  register: config_stat
+
+- name: 失敗提示：config 檔案不存在
+  ansible.builtin.fail:
+    msg: "找不到 {{ gateway_config_path }}，請先執行 openclaw setup"
+  when: not config_stat.stat.exists
+
+- name: 上傳 config 修改腳本
+  ansible.builtin.template:
+    src: fix-config.js.j2
+    dest: "{{ node_script_path }}"
+    mode: "0644"
+
+- name: 執行 node 腳本修改 config
+  ansible.builtin.command:
+    cmd: "node {{ node_script_path }}"
+  register: config_result
+  changed_when: true
+
+- name: 顯示 config 更新結果
+  ansible.builtin.debug:
+    msg: "{{ config_result.stdout }}"
+
+- name: 清理暫存腳本
+  ansible.builtin.file:
+    path: "{{ node_script_path }}"
+    state: absent
