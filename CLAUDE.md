@@ -18,6 +18,8 @@ make setup-claw        # Phase 4+6：建立 OpenClaw sandbox
 make apply-policies    # Phase 7：套用網路沙箱政策 YAML
 make verify            # Phase 8：驗證檔案系統與 credential 隔離
 make status            # 查看 sandbox 目前狀態
+make setup-host        # Phase 0：主機優化（防火牆、TCP Keepalive、Power Nap）
+make setup-bridge      # 安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack）
 ```
 
 ### Sandbox 操作
@@ -33,6 +35,12 @@ openshell logs claude-dev --since 10m | grep "action=deny"
 # Policy 熱更新（不需重啟 sandbox）
 openshell policy set claude-dev --policy policies/claude_dev_policy.yaml --wait
 openshell policy set claw-agent --policy policies/claw_agent_policy.yaml --wait
+
+# Ansible 操作（在 repo 根目錄執行）
+make dashboard         # 啟動 OpenClaw Dashboard（設定 config + gateway + LAN tunnel）
+make gw-restart        # 重啟 claw-agent gateway
+make sandbox-check     # 健康檢查（所有 sandbox + tunnel）
+make notebook-tunnel   # 從筆電建立 SSH tunnel（解決 Secure Context）
 ```
 
 ## 架構
@@ -95,6 +103,18 @@ network_policy:
 省略任一個會導致 proxy 回 403。
 
 **Live sandbox 限制：** 運行中的 sandbox 只能透過熱更新**新增**網路路徑，不能移除已有路徑。需要移除時要重啟 sandbox。
+
+## Bridge Go 開發
+
+Go Messaging Bridge 位於 `bridge-go/` 目錄，負責轉發訊息到 Discord/Telegram/Slack。
+
+```bash
+cd bridge-go
+go build -o ../bridge .    # 編譯
+./bridge                    # 執行（需設定 .env）
+```
+
+設定從 `.env` 讀取（參考 `.env.example`）。
 
 ## 腳本規範
 
