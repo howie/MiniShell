@@ -69,12 +69,12 @@ warn "開機自啟時請同時設定 launchd 環境變數 OLLAMA_HOST=0.0.0.0"
 # ── 拉取預設模型 ──────────────────────────────────────────────────────────────
 echo ""
 echo "── 下載模型 ─────────────────────────────────────────"
-DEFAULT_MODEL="qwen3:8b"
+DEFAULT_MODEL="gemma4:e4b"
 
 if ollama list 2>/dev/null | grep -q "${DEFAULT_MODEL}"; then
   info "模型 ${DEFAULT_MODEL} 已存在"
 else
-  step "下載 ${DEFAULT_MODEL}（約 5GB，請稍候）..."
+  step "下載 ${DEFAULT_MODEL}（約 10GB，請稍候）..."
   ollama pull "${DEFAULT_MODEL}"
   info "模型 ${DEFAULT_MODEL} 下載完成"
 fi
@@ -113,8 +113,7 @@ if openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "cla
   openshell inference get --sandbox claw-agent 2>/dev/null || \
     openshell inference get 2>/dev/null || true
 else
-  warn "Sandbox 'claw-agent' 不存在，略過 inference routing 設定"
-  warn "請先執行 make setup-claw，再重新執行 make setup-ollama"
+  info "Sandbox 'claw-agent' 尚未建立，inference routing 將在 setup-claw 階段設定"
 fi
 
 # ── 完成 ──────────────────────────────────────────────────────────────────────
@@ -123,7 +122,7 @@ info "Ollama 本地推理設定完成！"
 echo ""
 echo "  切換推理後端："
 echo "  本地 Ollama ："
-echo "    openshell inference set --sandbox claw-agent --provider ollama-local --model qwen3:8b"
+echo "    openshell inference set --sandbox claw-agent --provider ollama-local --model gemma4:e4b"
 echo "  雲端 Gemini  ："
 echo "    openshell inference set --sandbox claw-agent --provider gemini-flash --model gemini-3-flash"
 echo "  查看目前設定："

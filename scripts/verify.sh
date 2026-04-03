@@ -82,9 +82,9 @@ fi
 if [[ $HAS_CLAW -eq 1 ]]; then
   GOOGLE_IN_CLAW=$(openshell sandbox connect claw-agent -- bash -c "echo \$GOOGLE_API_KEY" 2>/dev/null || echo "")
   if [[ -n "$GOOGLE_IN_CLAW" ]]; then
-    pass "claw-agent sandbox 中存在 GOOGLE_API_KEY"
+    pass "claw-agent sandbox 中存在 GOOGLE_API_KEY（Gemini 雲端備援已設定）"
   else
-    warn "claw-agent sandbox 中沒有 GOOGLE_API_KEY（provider 可能未設定）"
+    pass "claw-agent sandbox 中沒有 GOOGLE_API_KEY（使用本地推理，正常）"
   fi
 fi
 
@@ -96,6 +96,13 @@ echo "── Ollama 推理驗證 ───────────────�
 if curl -sf http://localhost:11434/api/tags &>/dev/null; then
   pass "Host 端 Ollama 在線（localhost:11434）"
   OLLAMA_RUNNING=1
+
+  # 檢查 gemma4:e4b 模型是否已下載
+  if ollama list 2>/dev/null | grep -q "gemma4:e4b"; then
+    pass "模型 gemma4:e4b 已就緒"
+  else
+    warn "模型 gemma4:e4b 未下載（請執行 ollama pull gemma4:e4b）"
+  fi
 else
   warn "Host 端 Ollama 未在執行，略過 sandbox 連線測試"
   OLLAMA_RUNNING=0
@@ -110,8 +117,7 @@ if [[ $OLLAMA_RUNNING -eq 1 && $HAS_CLAW -eq 1 ]]; then
   if [[ "$CLAW_INFERENCE" == "ok" ]]; then
     pass "claw-agent 能透過 inference.local 連到推理後端"
   else
-    warn "claw-agent 無法連到 inference.local（可能尚未設定 inference routing）"
-    warn "請執行 make setup-ollama 後再驗證"
+    warn "claw-agent 無法連到 inference.local（請檢查 Ollama 是否正常運作）"
   fi
 
   # claude-dev 不應能透過直連到 Ollama
