@@ -57,8 +57,8 @@
   gather_facts: false
 
   vars:
-    tunnel_port: 18789
-    lan_ip: "192.168.1.29"
+    tunnel_port: "{{ hostvars['claw-agent']['gateway_port'] | default(18789) }}"
+    lan_ip: "{{ hostvars['claw-agent']['lan_ip'] | default('192.168.1.29') }}"
 
   tasks:
     - name: 測試本機 tunnel HTTP 回應
