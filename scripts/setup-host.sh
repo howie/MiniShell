@@ -49,6 +49,11 @@ if [[ -n "$FIREWALL_BIN" ]]; then
   # 找到需要加入的 binary 路徑
   BINARIES_TO_ADD=()
 
+  # ssh（允許 SSH tunnel 入站連線，LAN 遠端存取 OpenClaw dashboard 需要）
+  if [[ -f "/usr/bin/ssh" ]]; then
+    BINARIES_TO_ADD+=("/usr/bin/ssh")
+  fi
+
   # claude
   if [[ -f "/opt/homebrew/bin/claude" ]]; then
     BINARIES_TO_ADD+=("/opt/homebrew/bin/claude")

@@ -1,0 +1,23 @@
+// 由 Ansible 產生，請勿手動修改
+// 用途：透過 openclaw CLI 設定 gateway.controlUi.allowedOrigins
+// 使用 execFileSync 傳遞參數陣列，完全不經過 shell，無引號問題
+const { execFileSync } = require("child_process");
+
+const origins = [
+{% for origin in gateway_allowed_origins %}
+  "{{ origin }}"{% if not loop.last %},{% endif %}
+
+{% endfor %}
+];
+
+try {
+  execFileSync(
+    "openclaw",
+    ["config", "set", "gateway.controlUi.allowedOrigins", JSON.stringify(origins), "--strict-json"],
+    { stdio: "inherit" }
+  );
+  console.log("Config updated: gateway.controlUi.allowedOrigins =", JSON.stringify(origins));
+} catch (err) {
+  console.error("Failed to set config:", err.message);
+  process.exit(1);
+}

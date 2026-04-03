@@ -1,0 +1,8 @@
+---
+# 重啟 claw-agent gateway（不修改 config）
+- name: 重啟 OpenClaw Gateway
+  hosts: claw-agent
+  gather_facts: false
+
+  roles:
+    - role: ../roles/claw-gateway

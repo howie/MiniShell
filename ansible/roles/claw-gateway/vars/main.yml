@@ -1,0 +1,6 @@
+---
+node_script_path: "/tmp/fix-openclaw-config.js"
+gateway_binary: "openclaw"
+gateway_process_pattern: "openclaw gateway"
+gateway_start_timeout: 15
+gateway_start_retries: 10

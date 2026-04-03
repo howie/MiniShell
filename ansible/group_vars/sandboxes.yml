@@ -1,0 +1,14 @@
+---
+# Mac Mini 區域網路 IP
+lan_ip: "192.168.1.29"
+
+# OpenClaw gateway 設定
+gateway_port: 18789
+gateway_config_path: "/sandbox/.openclaw/openclaw.json"
+gateway_log_path: "/tmp/openclaw-gw.log"
+
+# Dashboard 允許的 origins
+gateway_allowed_origins:
+  - "http://127.0.0.1:{{ gateway_port }}"
+  - "http://localhost:{{ gateway_port }}"
+  - "http://{{ lan_ip }}:{{ gateway_port }}"
