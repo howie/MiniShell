@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 SCRIPTS := scripts
 
-.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge status
+.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go status
 
 # 預設 target：顯示說明
 help:
@@ -16,7 +16,7 @@ help:
 	@echo "  make apply-policies   套用 Policy YAML（policies/ 目錄）"
 	@echo "  make verify           驗證沙箱隔離"
 	@echo "  make setup-ollama     安裝本地 Ollama + Gemma 4 e4b 並設定 inference routing"
-	@echo "  make setup-bridge     安裝 Messaging Bridge（選配：Discord/Telegram/Slack）"
+	@echo "  make setup-bridge     安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack）"
 	@echo "  make status           查看目前 sandbox 狀態"
 	@echo ""
 
@@ -58,10 +58,12 @@ setup-ollama:
 	@chmod +x $(SCRIPTS)/setup-ollama.sh
 	@$(SCRIPTS)/setup-ollama.sh
 
-# Messaging Bridge（選配）
-setup-bridge:
-	@chmod +x $(SCRIPTS)/setup-bridge.sh
-	@$(SCRIPTS)/setup-bridge.sh
+# Messaging Bridge — Go 版（選配）
+setup-bridge: setup-bridge-go
+
+setup-bridge-go:
+	@chmod +x $(SCRIPTS)/setup-bridge-go.sh
+	@$(SCRIPTS)/setup-bridge-go.sh
 
 # 狀態查看
 status:

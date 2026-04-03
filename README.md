@@ -49,7 +49,7 @@ make verify           # 驗證隔離是否正常
 | `make setup-claw` | 建立 OpenClaw sandbox |
 | `make apply-policies` | 套用 `policies/` 目錄的 Policy YAML |
 | `make verify` | 驗證沙箱隔離 |
-| `make setup-bridge` | 安裝 Messaging Bridge（選配：Discord/Telegram/Slack） |
+| `make setup-bridge` | 安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack） |
 | `make status` | 查看目前 sandbox / provider 狀態 |
 
 ---
@@ -68,15 +68,9 @@ openshell-env/
 │   ├── setup-claw.sh
 │   ├── apply-policies.sh
 │   ├── verify.sh
-│   └── setup-bridge.sh         # Messaging Bridge 安裝（選配）
-├── bridge/                     # Messaging Bridge 原始碼
-│   ├── package.json
-│   ├── start.sh
-│   └── src/
-│       ├── index.js
-│       ├── executor.js
-│       ├── platforms/          # Discord / Telegram / Slack
-│       └── utils/              # sanitize / chunker
+│   └── setup-bridge-go.sh      # Go Messaging Bridge 安裝（選配）
+├── bridge-go/                  # Go Messaging Bridge（預編譯 binary）
+│   └── bridge-go-linux         # Linux ARM64 靜態連結 binary
 └── docs/                       # 文件
     ├── installation.md         # 完整安裝手冊（手動版）
     ├── usage.md                # 日常使用指南
