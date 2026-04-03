@@ -15,13 +15,13 @@ help:
 	@echo "  make setup-claw       建立 OpenClaw sandbox"
 	@echo "  make apply-policies   套用 Policy YAML（policies/ 目錄）"
 	@echo "  make verify           驗證沙箱隔離"
-	@echo "  make setup-ollama     安裝本地 Ollama 並設定 inference routing（選配）"
+	@echo "  make setup-ollama     安裝本地 Ollama + Gemma 4 e4b 並設定 inference routing"
 	@echo "  make setup-bridge     安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack）"
 	@echo "  make status           查看目前 sandbox 狀態"
 	@echo ""
 
 # 完整安裝
-install: setup-host install-base setup-claude setup-claw apply-policies verify
+install: setup-host install-base setup-claude setup-ollama setup-claw apply-policies verify
 
 # Phase 0：主機層級優化
 setup-host:
@@ -53,7 +53,7 @@ verify:
 	@chmod +x $(SCRIPTS)/verify.sh
 	@$(SCRIPTS)/verify.sh
 
-# 本地推理（選配）
+# 本地推理（已含在 install 流程中，也可獨立執行）
 setup-ollama:
 	@chmod +x $(SCRIPTS)/setup-ollama.sh
 	@$(SCRIPTS)/setup-ollama.sh

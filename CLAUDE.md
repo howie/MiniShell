@@ -10,9 +10,10 @@ openshell-env 是在 Mac Mini M4（Apple Silicon）上建立雙 AI sandbox 基�
 
 ```bash
 make help              # 顯示所有 targets
-make install           # 完整安裝（互動式，含所有 phase）
+make install           # 完整安裝（互動式，含所有 phase，含 Ollama + Gemma 4）
 make install-base      # Phase 1-3：安裝 Homebrew、OrbStack、OpenShell CLI
 make setup-claude      # Phase 4-5：建立 Claude Code sandbox
+make setup-ollama      # 安裝 Ollama + Gemma 4 e4b 本地推理
 make setup-claw        # Phase 4+6：建立 OpenClaw sandbox
 make apply-policies    # Phase 7：套用網路沙箱政策 YAML
 make verify            # Phase 8：驗證檔案系統與 credential 隔離
@@ -39,7 +40,7 @@ openshell policy set claw-agent --policy policies/claw_agent_policy.yaml --wait
 ### 隔離模型（三層）
 
 1. **檔案系統隔離（Landlock）** — 每個 sandbox 有獨立 `/sandbox` 工作目錄，不互通
-2. **Credential 隔離** — Claude OAuth token 和 Google API Key 只注入各自對應的 sandbox
+2. **Credential 隔離** — Claude OAuth token 和 Ollama/Gemini credential 只注入各自對應的 sandbox
 3. **網路隔離（Policy Gateway）** — 所有出站流量走 OpenShell Proxy，依 YAML 白名單決策
 
 ### 兩個 Sandbox
@@ -47,7 +48,23 @@ openshell policy set claw-agent --policy policies/claw_agent_policy.yaml --wait
 | Sandbox | 工具 | LLM | 認證方式 |
 |---------|------|-----|---------|
 | `claude-dev` | Claude Code | claude-opus/sonnet | OAuth（Pro/Max 訂閱） |
-| `claw-agent` | OpenClaw | Gemini 3 Flash | Google API Key |
+| `claw-agent` | OpenClaw | Gemma 4 e4b (local) | Ollama (openai-compatible) |
+
+> Gemini Flash 可作為選配雲端備援，安裝時選擇是否啟用。
+
+### Channel 整合
+
+claw-agent 透過 OpenClaw 內建 channel 支援連接通訊平台（單一 agent，多 channel 架構）：
+
+| Platform | 設定方式 | 備註 |
+|----------|---------|------|
+| Telegram | `make setup-claw` 互動設定 | @BotFather 建立 bot |
+| Discord  | `make setup-claw` 互動設定 | Developer Portal 建立 App |
+| Slack    | `make setup-claw` 互動設定 | Socket Mode（需 bot + app token） |
+| LINE     | `make setup-claw` 互動設定 | 需安裝 plugin `@openclaw/line` |
+
+Token 可預填在 `.env`（參考 `.env.example`），安裝時自動讀取。
+事後管理：`openclaw configure --section channels`（在 sandbox 內執行）。
 
 ## Policy YAML 注意事項
 
