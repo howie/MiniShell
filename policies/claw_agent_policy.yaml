@@ -51,6 +51,8 @@ network_policies:
     endpoints:
       - { host: github.com, port: 443 }
       - { host: api.github.com, port: 443 }
+      - { host: objects.githubusercontent.com, port: 443 }
+      - { host: release-assets.githubusercontent.com, port: 443 }
     binaries:
       - { path: /usr/bin/git }
       - { path: /usr/lib/git-core/git-remote-https }
