@@ -175,6 +175,190 @@ else
   warn "無推理後端，略過自動 onboarding"
 fi
 
+# ── OpenClaw Channel 設定（LINE / Telegram / Discord / Slack）────────────────
+echo ""
+echo "── OpenClaw Channel 設定 ────────────────────────────"
+echo "  OpenClaw 支援同時連接多個通訊平台（單一 agent，多 channel）"
+echo "  建議：先設定一個 channel 確認穩定後，再逐步新增"
+echo ""
+
+# 載入 .env（如果存在）
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+  # shellcheck disable=SC1091
+  source "$PROJECT_ROOT/.env"
+fi
+
+CHANNELS_JSON="{}"
+ENABLED_CHANNELS=""
+
+# ── Telegram ──
+echo -n "  啟用 Telegram？[y/N]: "
+read -r SETUP_TG
+if [[ "${SETUP_TG:-N}" =~ ^[Yy]$ ]]; then
+  TG_TOKEN="${CLAW_TELEGRAM_TOKEN:-}"
+  if [[ -z "$TG_TOKEN" ]]; then
+    echo "  從 @BotFather 取得 Bot Token（格式：123456:ABC-DEF...）"
+    echo -n "  Telegram Bot Token: "
+    read -rs TG_TOKEN
+    echo ""
+  fi
+  if [[ -n "$TG_TOKEN" ]]; then
+    CHANNELS_JSON=$(echo "$CHANNELS_JSON" | python3 -c "
+import sys, json
+c = json.load(sys.stdin)
+c['telegram'] = {
+  'enabled': True,
+  'botToken': '$(echo "$TG_TOKEN" | sed "s/'/\\\\'/g")',
+  'dmPolicy': 'pairing'
+}
+json.dump(c, sys.stdout)
+")
+    ENABLED_CHANNELS="$ENABLED_CHANNELS Telegram"
+    info "Telegram 已設定"
+  fi
+fi
+
+# ── Discord ──
+echo -n "  啟用 Discord？[y/N]: "
+read -r SETUP_DC
+if [[ "${SETUP_DC:-N}" =~ ^[Yy]$ ]]; then
+  DC_TOKEN="${CLAW_DISCORD_TOKEN:-}"
+  DC_APP_ID="${CLAW_DISCORD_APP_ID:-}"
+  if [[ -z "$DC_TOKEN" ]]; then
+    echo "  從 Discord Developer Portal 取得 Bot Token"
+    echo -n "  Discord Bot Token: "
+    read -rs DC_TOKEN
+    echo ""
+  fi
+  if [[ -z "$DC_APP_ID" ]]; then
+    echo -n "  Discord Application ID: "
+    read -r DC_APP_ID
+  fi
+  if [[ -n "$DC_TOKEN" && -n "$DC_APP_ID" ]]; then
+    CHANNELS_JSON=$(echo "$CHANNELS_JSON" | python3 -c "
+import sys, json
+c = json.load(sys.stdin)
+c['discord'] = {
+  'enabled': True,
+  'botToken': '$(echo "$DC_TOKEN" | sed "s/'/\\\\'/g")',
+  'applicationId': '$(echo "$DC_APP_ID" | sed "s/'/\\\\'/g")'
+}
+json.dump(c, sys.stdout)
+")
+    ENABLED_CHANNELS="$ENABLED_CHANNELS Discord"
+    info "Discord 已設定"
+  fi
+fi
+
+# ── Slack ──
+echo -n "  啟用 Slack？[y/N]: "
+read -r SETUP_SL
+if [[ "${SETUP_SL:-N}" =~ ^[Yy]$ ]]; then
+  SL_BOT="${CLAW_SLACK_BOT_TOKEN:-}"
+  SL_APP="${CLAW_SLACK_APP_TOKEN:-}"
+  if [[ -z "$SL_BOT" ]]; then
+    echo "  從 api.slack.com → OAuth & Permissions 取得 Bot Token（xoxb-...）"
+    echo -n "  Slack Bot Token: "
+    read -rs SL_BOT
+    echo ""
+  fi
+  if [[ -z "$SL_APP" ]]; then
+    echo "  從 Socket Mode 取得 App Token（xapp-...）"
+    echo -n "  Slack App Token: "
+    read -rs SL_APP
+    echo ""
+  fi
+  if [[ -n "$SL_BOT" && -n "$SL_APP" ]]; then
+    CHANNELS_JSON=$(echo "$CHANNELS_JSON" | python3 -c "
+import sys, json
+c = json.load(sys.stdin)
+c['slack'] = {
+  'enabled': True,
+  'botToken': '$(echo "$SL_BOT" | sed "s/'/\\\\'/g")',
+  'appToken': '$(echo "$SL_APP" | sed "s/'/\\\\'/g")'
+}
+json.dump(c, sys.stdout)
+")
+    ENABLED_CHANNELS="$ENABLED_CHANNELS Slack"
+    info "Slack 已設定"
+  fi
+fi
+
+# ── LINE ──
+echo -n "  啟用 LINE？[y/N]: "
+read -r SETUP_LINE
+if [[ "${SETUP_LINE:-N}" =~ ^[Yy]$ ]]; then
+  LINE_TOKEN="${CLAW_LINE_CHANNEL_TOKEN:-}"
+  LINE_SECRET="${CLAW_LINE_CHANNEL_SECRET:-}"
+  if [[ -z "$LINE_TOKEN" ]]; then
+    echo "  從 LINE Developers Console → Messaging API 取得"
+    echo -n "  LINE Channel Access Token: "
+    read -rs LINE_TOKEN
+    echo ""
+  fi
+  if [[ -z "$LINE_SECRET" ]]; then
+    echo -n "  LINE Channel Secret: "
+    read -rs LINE_SECRET
+    echo ""
+  fi
+  if [[ -n "$LINE_TOKEN" && -n "$LINE_SECRET" ]]; then
+    CHANNELS_JSON=$(echo "$CHANNELS_JSON" | python3 -c "
+import sys, json
+c = json.load(sys.stdin)
+c['line'] = {
+  'enabled': True,
+  'channelAccessToken': '$(echo "$LINE_TOKEN" | sed "s/'/\\\\'/g")',
+  'channelSecret': '$(echo "$LINE_SECRET" | sed "s/'/\\\\'/g")'
+}
+json.dump(c, sys.stdout)
+")
+    ENABLED_CHANNELS="$ENABLED_CHANNELS LINE"
+    info "LINE 已設定"
+  fi
+fi
+
+# ── 寫入 channels 設定到 sandbox ──
+if [[ "$CHANNELS_JSON" != "{}" ]]; then
+  step "寫入 channel 設定到 sandbox..."
+
+  # 安裝 LINE plugin（如果啟用了 LINE）
+  if echo "$CHANNELS_JSON" | python3 -c "import sys,json; sys.exit(0 if 'line' in json.load(sys.stdin) else 1)" 2>/dev/null; then
+    step "安裝 OpenClaw LINE plugin..."
+    openshell sandbox connect claw-agent -- bash -c \
+      "openclaw plugins install @openclaw/line 2>/dev/null" && \
+      info "LINE plugin 安裝完成" || \
+      warn "LINE plugin 安裝失敗（可稍後手動安裝：openclaw plugins install @openclaw/line）"
+  fi
+
+  # 組合完整的 openclaw.json channels 區塊
+  FULL_CONFIG=$(python3 -c "
+import json
+channels = json.loads('$(echo "$CHANNELS_JSON" | sed "s/'/\\\\'/g")')
+config = {
+  'channels': channels,
+  'agents': {
+    'defaults': {
+      'dmScope': 'per-channel-peer'
+    }
+  }
+}
+print(json.dumps(config, indent=2))
+")
+
+  openshell sandbox connect claw-agent -- bash -c "
+    mkdir -p /home/agent/.openclaw
+    cat > /home/agent/.openclaw/channels.json << 'CHANEOF'
+${FULL_CONFIG}
+CHANEOF
+  " 2>/dev/null && info "Channel 設定已寫入 sandbox" || \
+    warn "Channel 設定寫入失敗，請手動設定"
+
+  info "已啟用 channel:${ENABLED_CHANNELS}"
+else
+  info "未啟用任何 channel（可稍後進入 sandbox 執行 openclaw configure --section channels）"
+fi
+
 # ── 完成 ──────────────────────────────────────────────────────────────────────
 echo ""
 info "OpenClaw sandbox 建立完成！"
@@ -201,5 +385,18 @@ elif [ "$HAS_GEMINI" = true ]; then
 else
   echo "  2. 請先設定推理後端："
   echo "     make setup-ollama   （本地 Gemma 4 e4b）"
+fi
+
+if [[ -n "$ENABLED_CHANNELS" ]]; then
+  echo ""
+  echo "  已啟用 Channel:${ENABLED_CHANNELS}"
+  echo "  管理 channel："
+  echo "    openclaw configure --section channels    （在 sandbox 內）"
+  echo "  新增/移除 channel："
+  echo "    重新執行 make setup-claw"
+else
+  echo ""
+  echo "  新增通訊 channel（LINE/Telegram/Discord/Slack）："
+  echo "    重新執行 make setup-claw 或在 sandbox 內執行 openclaw configure --section channels"
 fi
 echo ""

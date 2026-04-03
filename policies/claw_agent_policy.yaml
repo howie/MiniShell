@@ -86,3 +86,12 @@ network_policies:
       - { host: wss-backup.slack.com, port: 443 }
     binaries:
       - { path: /usr/bin/node }
+
+  line:
+    name: line
+    endpoints:
+      - { host: api.line.me, port: 443 }
+      - { host: api-data.line.me, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }

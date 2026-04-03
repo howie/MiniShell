@@ -52,6 +52,20 @@ openshell policy set claw-agent --policy policies/claw_agent_policy.yaml --wait
 
 > Gemini Flash 可作為選配雲端備援，安裝時選擇是否啟用。
 
+### Channel 整合
+
+claw-agent 透過 OpenClaw 內建 channel 支援連接通訊平台（單一 agent，多 channel 架構）：
+
+| Platform | 設定方式 | 備註 |
+|----------|---------|------|
+| Telegram | `make setup-claw` 互動設定 | @BotFather 建立 bot |
+| Discord  | `make setup-claw` 互動設定 | Developer Portal 建立 App |
+| Slack    | `make setup-claw` 互動設定 | Socket Mode（需 bot + app token） |
+| LINE     | `make setup-claw` 互動設定 | 需安裝 plugin `@openclaw/line` |
+
+Token 可預填在 `.env`（參考 `.env.example`），安裝時自動讀取。
+事後管理：`openclaw configure --section channels`（在 sandbox 內執行）。
+
 ## Policy YAML 注意事項
 
 Policy 檔位於 `policies/` 目錄，修改後用 `make apply-policies` 套用。
