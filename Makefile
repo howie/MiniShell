@@ -2,14 +2,30 @@ SHELL := /bin/bash
 SCRIPTS := scripts
 ANSIBLE_PLAYBOOK := uvx --from ansible-core ansible-playbook
 
-.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go status dashboard gw-restart sandbox-check notebook-tunnel
+# Colors for output
+CYAN  := \033[36m
+GREEN := \033[32m
+YELLOW:= \033[33m
+RESET := \033[0m
+
+.PHONY: help install install-hooks lint check \
+        setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama \
+        setup-bridge setup-bridge-go status dashboard gw-restart sandbox-check notebook-tunnel
 
 # 預設 target：顯示說明
 help:
 	@echo ""
-	@echo "OpenShell 雙 Sandbox 環境管理"
+	@echo "$(CYAN)OpenShell 雙 Sandbox 環境管理$(RESET)"
 	@echo ""
+	@echo "$(GREEN)安裝指令:$(RESET)"
 	@echo "  make install          完整安裝（host → base → claude → claw → policies → verify）"
+	@echo "  make install-hooks    安裝 pre-commit hooks"
+	@echo ""
+	@echo "$(GREEN)程式碼品質:$(RESET)"
+	@echo "  make lint             shellcheck 檢查所有 scripts/*.sh"
+	@echo "  make check            同 lint（shellcheck 不自動修正）"
+	@echo ""
+	@echo "$(GREEN)Sandbox 建立:$(RESET)"
 	@echo "  make setup-host       主機優化（防火牆、TCP Keepalive、Power Nap）"
 	@echo "  make install-base     安裝基礎環境（Homebrew、工具、OrbStack、OpenShell）"
 	@echo "  make setup-claude     建立 Claude Code sandbox"
@@ -20,15 +36,42 @@ help:
 	@echo "  make setup-bridge     安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack）"
 	@echo "  make status           查看目前 sandbox 狀態"
 	@echo ""
-	@echo "Ansible 自動化："
+	@echo "$(GREEN)Ansible 自動化:$(RESET)"
 	@echo "  make dashboard        一鍵啟動 OpenClaw Dashboard（設定 config + gateway + LAN tunnel）"
 	@echo "  make notebook-tunnel  從筆電建立 SSH tunnel（解決 Secure Context，在筆電上執行）"
 	@echo "  make gw-restart       重啟 claw-agent gateway"
 	@echo "  make sandbox-check    健康檢查（所有 sandbox + tunnel）"
 	@echo ""
 
-# 完整安裝
-install: setup-host install-base setup-claude setup-ollama setup-claw apply-policies verify
+# =============================================================================
+# Installation
+# =============================================================================
+
+install: install-hooks setup-host install-base setup-claude setup-ollama setup-claw apply-policies verify
+
+install-hooks:
+	uvx pre-commit install
+	cp scripts/no-push-to-main.sh .git/hooks/pre-push
+	chmod +x .git/hooks/pre-push
+	@echo "$(GREEN)✓ pre-commit hooks 已安裝（pre-commit + pre-push）$(RESET)"
+
+# =============================================================================
+# Code Quality
+# =============================================================================
+
+lint:
+	@echo "$(CYAN)shellcheck scripts/*.sh...$(RESET)"
+	shellcheck scripts/*.sh
+	@echo "$(GREEN)✓ shellcheck 通過$(RESET)"
+
+check: lint
+
+# =============================================================================
+# Sandbox Setup
+# =============================================================================
+
+# 完整安裝（不含 install-hooks，避免重複）
+
 
 # Phase 0：主機層級優化
 setup-host:

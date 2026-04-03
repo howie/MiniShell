@@ -1,0 +1,39 @@
+repos:
+  # Basic file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+        args: ['--unsafe']
+
+  # Secret detection
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # Shell script linting
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck
+        language: system
+        files: ^scripts/.*\.sh$
+        pass_filenames: true
+
+  # Block accidental direct push to main from worktree branches
+  - repo: local
+    hooks:
+      - id: no-push-to-main
+        name: Block direct push to main from non-main branches
+        entry: bash scripts/no-push-to-main.sh
+        language: system
+        always_run: true
+        stages: [pre-push]
