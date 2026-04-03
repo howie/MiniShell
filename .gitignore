@@ -1,4 +1,7 @@
 
 .claude/settings.local.json
+.claude/worktrees/
 .env
 bridge-go/bridge-go
+bridge-go/bridge-go-linux
+policies/*.bak*
