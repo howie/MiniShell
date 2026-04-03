@@ -221,6 +221,7 @@ network_policies:
       - { host: gateway.discord.gg, port: 443 }
     binaries:
       - { path: /usr/bin/node }
+      - { path: /sandbox/messaging-bridge/bridge-go }
 
   messaging_telegram:
     name: messaging-telegram
@@ -229,6 +230,7 @@ network_policies:
     binaries:
       - { path: /usr/bin/node }
       - { path: /sandbox/.local/bin/bun }
+      - { path: /sandbox/messaging-bridge/bridge-go }
 
   messaging_slack:
     name: messaging-slack
@@ -243,3 +245,4 @@ network_policies:
         tls: passthrough
     binaries:
       - { path: /usr/bin/node }
+      - { path: /sandbox/messaging-bridge/bridge-go }
