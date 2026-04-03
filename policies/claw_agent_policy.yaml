@@ -5,13 +5,16 @@ filesystem_policy:
   read_write:
     - /sandbox
     - /tmp
+    - /dev/null
     - /home/agent/.openclaw
   read_only:
+    - /app
     - /usr
     - /lib
     - /proc
     - /dev/urandom
     - /etc
+    - /var/log
 
 landlock:
   compatibility: best_effort
