@@ -18,6 +18,12 @@ type Config struct {
 type ExecutorConfig struct {
 	TimeoutMs    int    `json:"timeout_ms"`
 	ClaudeBinary string `json:"claude_binary"`
+	// SystemPrompt is prepended to every request as --system-prompt.
+	// If empty, the default provenance watermark is used.
+	SystemPrompt string `json:"system_prompt,omitempty"`
+	// AllowedCallers lists the agent identities permitted to call this gateway.
+	// Logged in the provenance header for audit trail.
+	AllowedCallers []string `json:"allowed_callers,omitempty"`
 	// SSHHost is read from ACP_GATEWAY_SSH_HOST env var, not from JSON.
 	SSHHost string `json:"-"`
 }

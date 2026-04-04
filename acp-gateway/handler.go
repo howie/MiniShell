@@ -11,6 +11,9 @@ import (
 type PromptRequest struct {
 	Prompt    string `json:"prompt"`
 	TimeoutMs int    `json:"timeout_ms,omitempty"`
+	// Caller identifies the agent sending this request (e.g. "openclaw/claw-agent").
+	// Logged for audit trail and included in provenance metadata.
+	Caller string `json:"caller,omitempty"`
 }
 
 // PromptResponse is the response body for POST /v1/prompt.
@@ -56,10 +59,17 @@ func handlePrompt(execCfg ExecutorConfig, pool *SessionPool) http.HandlerFunc {
 			return
 		}
 
+		// Log caller identity for audit trail.
+		caller := req.Caller
+		if caller == "" {
+			caller = "unknown"
+		}
+		slog.Info("prompt request", "caller", caller, "prompt_len", len(req.Prompt))
+
 		// Sanitize the prompt.
 		prompt, truncated := sanitizePrompt(req.Prompt)
 		if truncated {
-			slog.Warn("prompt truncated", "original_len", len(req.Prompt))
+			slog.Warn("prompt truncated", "original_len", len(req.Prompt), "caller", caller)
 		}
 
 		// Apply per-request timeout override.
