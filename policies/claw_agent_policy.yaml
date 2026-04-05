@@ -84,6 +84,16 @@ network_policies:
       - { path: /usr/bin/node }
       - { path: /usr/bin/npm }
 
+  golang:
+    name: golang
+    endpoints:
+      - { host: proxy.golang.org, port: 443 }
+      - { host: sum.golang.org, port: 443 }
+    binaries:
+      - { path: /sandbox/.local/go/bin/go }
+      # Go 1.25+ toolchain auto-downloaded by GOTOOLCHAIN=auto; update this path when upgrading
+      - { path: /sandbox/.local/gopath/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.8.linux-arm64/bin/go }
+
   discord:
     name: discord
     endpoints:
