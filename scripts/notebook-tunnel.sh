@@ -56,18 +56,24 @@ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERRO
 # ── 2. 建立 Mac Mini host → sandbox tunnel ───────────────────────────────────
 echo "建立 Mac Mini 內部 tunnel（host:${LOCAL_PORT} → ${SANDBOX}:${GATEWAY_PORT}）..."
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-    "${MINI_HOST}" "
-    # 停掉舊的 tunnel（同 port）
-    lsof -ti :${LOCAL_PORT} 2>/dev/null | xargs kill -9 2>/dev/null || true
-    sleep 1
-    # 建立 host → sandbox tunnel
-    ssh -fN \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR \
-        -L 0.0.0.0:${LOCAL_PORT}:127.0.0.1:${GATEWAY_PORT} \
-        ${SSH_HOST}
-"
+    "${MINI_HOST}" bash -c "'
+    # 檢查 tunnel 是否已存在
+    if lsof -ti :${LOCAL_PORT} 2>/dev/null | head -1 | xargs -I{} ps -p {} -o args= 2>/dev/null | grep -q ${SSH_HOST}; then
+        echo \"tunnel 已存在，跳過\"
+    else
+        lsof -ti :${LOCAL_PORT} 2>/dev/null | xargs kill -9 2>/dev/null || true
+        sleep 1
+        nohup ssh -N \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            -o ExitOnForwardFailure=yes \
+            -L ${LOCAL_PORT}:127.0.0.1:${GATEWAY_PORT} \
+            ${SSH_HOST} </dev/null >/dev/null 2>&1 &
+        sleep 2
+        echo \"tunnel 已建立\"
+    fi
+'"
 
 # ── 3. 停止本機佔用 port 的程序 ──────────────────────────────────────────────
 if lsof -ti :"${LOCAL_PORT}" &>/dev/null; then
