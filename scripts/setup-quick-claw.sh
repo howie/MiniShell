@@ -126,7 +126,6 @@ echo "── Inference Routing ────────────────�
 
 step "設定 inference routing（${MODEL}）..."
 openshell inference set \
-  --sandbox "${SANDBOX_NAME}" \
   --provider ollama-local \
   --model "${MODEL}" 2>/dev/null && info "Inference routing 已設定" || \
   warn "Inference routing 設定失敗（可手動設定）"
@@ -188,7 +187,7 @@ echo "  驗證推理："
 echo "    curl https://inference.local/v1/models"
 echo ""
 echo "  切換模型（在 sandbox 外執行）："
-echo "    openshell inference set --sandbox ${SANDBOX_NAME} --provider ollama-local --model <model>"
+echo "    openshell inference set --provider ollama-local --model <model>"
 echo ""
 echo "  日後加入通訊 channel："
 echo "    進入 sandbox 後執行 openclaw configure --section channels"
