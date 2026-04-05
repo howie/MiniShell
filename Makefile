@@ -90,9 +90,11 @@ dashboard:
 	@cd ansible && $(ANSIBLE_PLAYBOOK) -i inventory.yml playbooks/claw-dashboard.yml
 
 # 筆電 localhost tunnel（解決 Secure Context，在筆電上執行）
+# 用法：make notebook-tunnel                            → claw-agent (port 18789)
+#       make notebook-tunnel SANDBOX=claw-ollama-gemma4 → quick-claw (port 18790)
 notebook-tunnel:
 	@chmod +x $(SCRIPTS)/notebook-tunnel.sh
-	@$(SCRIPTS)/notebook-tunnel.sh
+	@SANDBOX=$(SANDBOX) $(SCRIPTS)/notebook-tunnel.sh
 
 # 重啟 claw-agent gateway（Ansible）
 gw-restart:
