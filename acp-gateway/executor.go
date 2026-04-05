@@ -52,6 +52,8 @@ func Execute(ctx context.Context, cfg ExecutorConfig, prompt string) ExecResult 
 	defer cancel()
 
 	// Build the provenance system prompt.
+	// Note: sysPrompt comes from config.json or the hardcoded default — never
+	// from agent/user input. The agent-supplied prompt goes via stdin only.
 	sysPrompt := cfg.SystemPrompt
 	if sysPrompt == "" {
 		sysPrompt = defaultProvenancePrompt
@@ -59,10 +61,16 @@ func Execute(ctx context.Context, cfg ExecutorConfig, prompt string) ExecResult 
 
 	var cmd *exec.Cmd
 	if cfg.SSHHost != "" {
-		cmd = exec.CommandContext(ctx, "ssh", cfg.SSHHost,
-			cfg.ClaudeBinary, "--output-format", "text",
-			"--system-prompt", sysPrompt)
+		// For SSH, exec.Command joins args and the remote shell interprets them.
+		// Since sysPrompt is admin-controlled (config/default), we single-quote it
+		// to prevent accidental shell interpretation. Any single quotes in the
+		// prompt are escaped with the standard sh pattern: ' → '\''
+		quoted := "'" + strings.ReplaceAll(sysPrompt, "'", `'\''`) + "'"
+		remoteCmd := fmt.Sprintf("%s --output-format text --system-prompt %s",
+			cfg.ClaudeBinary, quoted)
+		cmd = exec.CommandContext(ctx, "ssh", cfg.SSHHost, remoteCmd)
 	} else {
+		// Local: exec.Command passes args directly, no shell involved.
 		cmd = exec.CommandContext(ctx, cfg.ClaudeBinary,
 			"--output-format", "text",
 			"--system-prompt", sysPrompt)

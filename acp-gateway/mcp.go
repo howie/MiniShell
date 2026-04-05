@@ -196,18 +196,22 @@ func handleMCPDelete() http.HandlerFunc {
 
 func writeRPCResult(w http.ResponseWriter, id any, result any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(jsonRPCResponse{
+	if err := json.NewEncoder(w).Encode(jsonRPCResponse{
 		JSONRPC: "2.0",
 		ID:      id,
 		Result:  result,
-	})
+	}); err != nil {
+		slog.Error("mcp: failed to encode JSON-RPC result", "err", err)
+	}
 }
 
 func writeRPCError(w http.ResponseWriter, id any, code int, message string) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(jsonRPCResponse{
+	if err := json.NewEncoder(w).Encode(jsonRPCResponse{
 		JSONRPC: "2.0",
 		ID:      id,
 		Error:   &rpcError{Code: code, Message: message},
-	})
+	}); err != nil {
+		slog.Error("mcp: failed to encode JSON-RPC error", "err", err)
+	}
 }

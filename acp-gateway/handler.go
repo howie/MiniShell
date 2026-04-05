@@ -41,8 +41,7 @@ func handleHealth(pool *SessionPool) http.HandlerFunc {
 			Sessions: pool.Count(),
 			Uptime:   int64(time.Since(startTime).Seconds()),
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		writeJSON(w, http.StatusOK, resp)
 	}
 }
 
@@ -88,10 +87,19 @@ func handlePrompt(execCfg ExecutorConfig, pool *SessionPool) http.HandlerFunc {
 			TimedOut:   result.TimedOut,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
+		status := http.StatusOK
 		if !result.Success {
-			w.WriteHeader(http.StatusInternalServerError)
+			status = http.StatusInternalServerError
 		}
-		json.NewEncoder(w).Encode(resp)
+		writeJSON(w, status, resp)
+	}
+}
+
+// writeJSON encodes v as JSON and writes it with the given status code.
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		slog.Error("failed to encode JSON response", "err", err)
 	}
 }

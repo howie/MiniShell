@@ -68,10 +68,20 @@ if [[ -f "$ENV_FILE" ]] && grep -q "ACP_GATEWAY_TOKEN=" "$ENV_FILE"; then
   # shellcheck source=/dev/null
   source "$ENV_FILE"
 else
-  ACP_GATEWAY_TOKEN=$(openssl rand -hex 32)
+  ACP_GATEWAY_TOKEN=$(openssl rand -hex 32) || { echo "  ✗ openssl rand 失敗"; exit 1; }
+  if [[ -z "$ACP_GATEWAY_TOKEN" ]]; then
+    echo "  ✗ 產生的 token 為空"
+    exit 1
+  fi
   echo "ACP_GATEWAY_TOKEN=$ACP_GATEWAY_TOKEN" > "$ENV_FILE"
   chmod 600 "$ENV_FILE"
   echo "  ✓ 已產生新 auth token → $ENV_FILE"
+fi
+
+# Validate token is non-empty after sourcing.
+if [[ -z "${ACP_GATEWAY_TOKEN:-}" ]]; then
+  echo "  ✗ ACP_GATEWAY_TOKEN 為空 — 請檢查 $ENV_FILE"
+  exit 1
 fi
 
 echo ""
@@ -79,7 +89,11 @@ echo ""
 # ── Phase 3: Build Go binary ─────────────────────────────────────────────────
 echo "[3/6] 編譯 ACP Gateway..."
 
-(cd "$GATEWAY_DIR" && go build -o acp-gateway .)
+(cd "$GATEWAY_DIR" && go build -o acp-gateway .) || { echo "  ✗ Go 編譯失敗"; exit 1; }
+if [[ ! -f "$GATEWAY_DIR/acp-gateway" ]]; then
+  echo "  ✗ 編譯產物不存在"
+  exit 1
+fi
 echo "  ✓ 已編譯 $GATEWAY_DIR/acp-gateway"
 
 echo ""
@@ -99,10 +113,6 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
     "ttl_seconds": 1800,
     "max_sessions": 10,
     "max_history": 20
-  },
-  "rate_limit": {
-    "requests_per_minute": 10,
-    "burst_size": 3
   }
 }
 CONFIGEOF

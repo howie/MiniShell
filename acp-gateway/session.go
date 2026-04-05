@@ -124,20 +124,29 @@ func (p *SessionPool) cleanup() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := time.Now()
+	// Collect expired IDs first to avoid deleting during iteration.
+	var expired []string
 	for id, s := range p.sessions {
 		s.mu.Lock()
 		idle := now.Sub(s.LastUsed) > p.ttl
 		s.mu.Unlock()
 		if idle {
-			delete(p.sessions, id)
-			slog.Info("session expired", "id", id)
+			expired = append(expired, id)
 		}
+	}
+	for _, id := range expired {
+		delete(p.sessions, id)
+		slog.Info("session expired", "id", id)
 	}
 }
 
 func generateID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback: use timestamp + counter (should never happen in practice).
+		slog.Error("crypto/rand.Read failed", "err", err)
+		return hex.EncodeToString([]byte(time.Now().String()))
+	}
 	return hex.EncodeToString(b)
 }
 

@@ -150,14 +150,19 @@ async function handleRequest(req) {
 // Read JSON-RPC messages from stdin, one per line.
 const rl = createInterface({ input: process.stdin, terminal: false });
 
-rl.on("line", async (line) => {
+rl.on("line", (line) => {
   const trimmed = line.trim();
   if (!trimmed) return;
+  let id = null;
   try {
     const req = JSON.parse(trimmed);
-    await handleRequest(req);
+    id = req.id ?? null;
+    handleRequest(req).catch((err) => {
+      stderr.write(`[mcp-claude-code] unhandled error: ${err.message}\n`);
+      sendError(id, -32603, `Internal error: ${err.message}`);
+    });
   } catch (err) {
-    sendError(null, -32700, "Parse error");
+    sendError(id, -32700, "Parse error");
   }
 });
 
