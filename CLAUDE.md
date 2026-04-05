@@ -13,6 +13,7 @@ make help              # 顯示所有 targets
 make install           # 完整安裝（互動式，含所有 phase，含 Ollama + Gemma 4）
 make install-base      # Phase 1-3：安裝 Homebrew、OrbStack、OpenShell CLI
 make setup-claude      # Phase 4-5：建立 Claude Code sandbox
+make quick-claw        # 一鍵啟動 OpenClaw（本地 Ollama gemma4，不需 API key）
 make setup-ollama      # 安裝 Ollama + Gemma 4 e4b 本地推理
 make setup-claw        # Phase 4+6：建立 OpenClaw sandbox
 make apply-policies    # Phase 7：套用網路沙箱政策 YAML
@@ -57,6 +58,7 @@ make notebook-tunnel   # 從筆電建立 SSH tunnel（解決 Secure Context）
 |---------|------|-----|---------|
 | `claude-dev` | Claude Code | claude-opus/sonnet | OAuth（Pro/Max 訂閱） |
 | `claw-agent` | OpenClaw | Gemma 4 e4b (local) | Ollama (openai-compatible) |
+| `claw-ollama-gemma4` | OpenClaw | Gemma 4 (local) | Ollama（`make quick-claw` 一鍵建立） |
 
 > Gemini Flash 可作為選配雲端備援，安裝時選擇是否啟用。
 

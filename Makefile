@@ -2,7 +2,7 @@ SHELL := /bin/bash
 SCRIPTS := scripts
 ANSIBLE_PLAYBOOK := uvx --from ansible-core ansible-playbook
 
-.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go setup-acp-gateway status dashboard gw-restart sandbox-check notebook-tunnel
+.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go setup-acp-gateway quick-claw status dashboard gw-restart sandbox-check notebook-tunnel
 
 # 預設 target：顯示說明
 help:
@@ -16,6 +16,7 @@ help:
 	@echo "  make setup-claw       建立 OpenClaw sandbox"
 	@echo "  make apply-policies   套用 Policy YAML（policies/ 目錄）"
 	@echo "  make verify           驗證沙箱隔離"
+	@echo "  make quick-claw       一鍵啟動 OpenClaw（本地 Ollama，不需任何 API key）"
 	@echo "  make setup-ollama     安裝本地 Ollama + Gemma 4 e4b 並設定 inference routing"
 	@echo "  make setup-bridge     安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack）"
 	@echo "  make setup-acp-gateway 安裝 ACP Gateway（選配：讓 OpenClaw 使用 Claude Code）"
@@ -65,6 +66,11 @@ verify:
 setup-ollama:
 	@chmod +x $(SCRIPTS)/setup-ollama.sh
 	@$(SCRIPTS)/setup-ollama.sh
+
+# Quick OpenClaw — 一鍵本地 AI sandbox（Ollama + OpenClaw，不需 API key）
+quick-claw:
+	@chmod +x $(SCRIPTS)/setup-quick-claw.sh
+	@$(SCRIPTS)/setup-quick-claw.sh $(MODEL)
 
 # Messaging Bridge — Go 版（選配）
 setup-bridge: setup-bridge-go
