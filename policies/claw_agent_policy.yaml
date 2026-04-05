@@ -38,6 +38,15 @@ network_policies:
       - { path: /usr/bin/node }
       - { path: /usr/bin/curl }
 
+  acp_gateway:
+    name: acp_gateway
+    endpoints:
+      - { host: host.docker.internal, port: 7865 }
+      - { host: host.openshell.internal, port: 7865 }
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }
+
   telegram:
     name: telegram
     endpoints:

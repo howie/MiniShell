@@ -2,7 +2,7 @@ SHELL := /bin/bash
 SCRIPTS := scripts
 ANSIBLE_PLAYBOOK := uvx --from ansible-core ansible-playbook
 
-.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go status dashboard gw-restart sandbox-check notebook-tunnel
+.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go setup-acp-gateway status dashboard gw-restart sandbox-check notebook-tunnel
 
 # 預設 target：顯示說明
 help:
@@ -18,6 +18,7 @@ help:
 	@echo "  make verify           驗證沙箱隔離"
 	@echo "  make setup-ollama     安裝本地 Ollama + Gemma 4 e4b 並設定 inference routing"
 	@echo "  make setup-bridge     安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack）"
+	@echo "  make setup-acp-gateway 安裝 ACP Gateway（選配：讓 OpenClaw 使用 Claude Code）"
 	@echo "  make status           查看目前 sandbox 狀態"
 	@echo ""
 	@echo "Ansible 自動化："
@@ -71,6 +72,11 @@ setup-bridge: setup-bridge-go
 setup-bridge-go:
 	@chmod +x $(SCRIPTS)/setup-bridge-go.sh
 	@$(SCRIPTS)/setup-bridge-go.sh
+
+# ACP Gateway — 讓 OpenClaw 使用 Claude Code（選配）
+setup-acp-gateway:
+	@chmod +x $(SCRIPTS)/setup-acp-gateway.sh
+	@$(SCRIPTS)/setup-acp-gateway.sh
 
 # Dashboard LAN 存取（Ansible）
 dashboard:
