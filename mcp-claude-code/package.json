@@ -1,0 +1,11 @@
+{
+  "name": "mcp-claude-code",
+  "version": "1.0.0",
+  "description": "Stdio MCP server that proxies claude_code tool calls to the ACP Gateway HTTP API",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {}
+}
