@@ -17,7 +17,7 @@ echo "────────────────────────�
 
 # 擷取 logs（分開執行以便偵測 openshell 本身失敗）
 if ! log_output=$(openshell logs "$SANDBOX" --since "$SINCE" 2>&1); then
-  echo "錯誤：openshell logs 指令失敗（sandbox: $SANDBOX）" >&2
+  echo "錯誤：openshell logs 指令失敗（sandbox: ${SANDBOX}）" >&2
   echo "$log_output" >&2
   exit 1
 fi

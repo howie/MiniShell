@@ -49,7 +49,7 @@ else
   # 等待最多 15 秒
   for i in $(seq 1 15); do
     if curl -sf http://localhost:11434/api/tags &>/dev/null; then
-      info "Ollama 已啟動（PID: $OLLAMA_PID）"
+      info "Ollama 已啟動（PID: ${OLLAMA_PID}）"
       break
     fi
     sleep 1
@@ -69,12 +69,13 @@ warn "開機自啟時請同時設定 launchd 環境變數 OLLAMA_HOST=0.0.0.0"
 # ── 拉取預設模型 ──────────────────────────────────────────────────────────────
 echo ""
 echo "── 下載模型 ─────────────────────────────────────────"
-DEFAULT_MODEL="gemma4:e4b"
+DEFAULT_MODEL="gemma4:e2b"   # T1 快速層：輕量本地模型（~1.5GB，<1s 回應）
+# 若需要更強的本地推理可改用 gemma4:e4b（3.5GB）或 gemma4:12b（8GB）
 
 if ollama list 2>/dev/null | grep -q "${DEFAULT_MODEL}"; then
   info "模型 ${DEFAULT_MODEL} 已存在"
 else
-  step "下載 ${DEFAULT_MODEL}（約 10GB，請稍候）..."
+  step "下載 ${DEFAULT_MODEL}（約 1.5GB，請稍候）..."
   ollama pull "${DEFAULT_MODEL}"
   info "模型 ${DEFAULT_MODEL} 下載完成"
 fi
@@ -102,16 +103,15 @@ echo ""
 echo "── 設定 Inference Routing ───────────────────────────"
 
 if openshell sandbox list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q "claw-agent"; then
-  step "設定 claw-agent 使用 ollama-local 作為預設推理後端..."
+  step "設定 ollama-local 作為 gateway 推理後端..."
+  # 注意：openshell inference set 是 gateway-level，不支援 --sandbox flag
   openshell inference set \
-    --sandbox claw-agent \
     --provider ollama-local \
     --model "${DEFAULT_MODEL}"
   info "Inference routing 設定完成"
 
   step "確認設定..."
-  openshell inference get --sandbox claw-agent 2>/dev/null || \
-    openshell inference get 2>/dev/null || true
+  openshell inference get 2>/dev/null || true
 else
   info "Sandbox 'claw-agent' 尚未建立，inference routing 將在 setup-claw 階段設定"
 fi
@@ -121,12 +121,12 @@ echo ""
 info "Ollama 本地推理設定完成！"
 echo ""
 echo "  切換推理後端："
-echo "  本地 Ollama ："
-echo "    openshell inference set --sandbox claw-agent --provider ollama-local --model gemma4:e4b"
-echo "  雲端 Gemini  ："
-echo "    openshell inference set --sandbox claw-agent --provider gemini-flash --model gemini-3-flash"
+echo "  T1 本地 Ollama（快速）："
+echo "    openshell inference set --provider ollama-local --model gemma4:e2b"
+echo "  T2 雲端 Gemini Flash："
+echo "    openshell inference set --provider gemini-flash --model gemini-2.5-flash"
 echo "  查看目前設定："
-echo "    openshell inference get --sandbox claw-agent"
+echo "    openshell inference get"
 echo ""
 echo "  在 sandbox 內驗證連線："
 echo "    openshell sandbox connect claw-agent"
