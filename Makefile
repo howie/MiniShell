@@ -14,6 +14,7 @@ help:
 	@echo "  make install-base     安裝基礎環境（Homebrew、工具、OrbStack、OpenShell）"
 	@echo "  make setup-claude     建立 Claude Code sandbox"
 	@echo "  make setup-claw       建立 OpenClaw sandbox"
+	@echo "  make setup-claw-go    安裝 Go 工具鏈到 claw-agent（解鎖 Go-based skills）"
 	@echo "  make apply-policies   套用 Policy YAML（policies/ 目錄）"
 	@echo "  make verify           驗證沙箱隔離"
 	@echo "  make quick-claw       一鍵啟動 OpenClaw（本地 Ollama，不需任何 API key）"
@@ -52,6 +53,11 @@ setup-claude:
 setup-claw:
 	@chmod +x $(SCRIPTS)/setup-claw.sh
 	@$(SCRIPTS)/setup-claw.sh
+
+# Go 工具鏈 + 靜態 binary（jq/rg/ffmpeg）→ 解鎖 Go-based OpenClaw skills
+setup-claw-go:
+	@chmod +x $(SCRIPTS)/setup-claw-go.sh
+	@$(SCRIPTS)/setup-claw-go.sh
 
 # Phase 7：套用 policy
 apply-policies:
