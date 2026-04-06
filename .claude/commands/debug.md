@@ -4,13 +4,12 @@ Structured debugging methodology for this project. Enforces root cause analysis 
 
 ## Autonomous Mode（預設行為）
 
-收到 error log 或 failing test 時，自主完成以下流程，不要問問題：
-1. 閱讀 failing test 和相關原始碼，理解預期行為
+收到 error log 或問題描述時，自主完成以下流程，不要問問題：
+1. 閱讀相關腳本和設定，理解預期行為
 2. 追蹤錯誤路徑，定位 root cause
 3. 實作最小修復
-4. 跑 `make test` 完整測試，失敗就迭代修復
-5. 跑 `make lint` 修正 lint 問題
-6. 全部通過後，建立 PR，描述 root cause 和修復內容
+4. 跑 `make verify` 驗證隔離正常，失敗就迭代修復
+5. 全部通過後，建立 PR，描述 root cause 和修復內容
 
 遇到模糊的設計決策時，選較安全/簡單的方案，並在 PR description 中註記。
 
@@ -18,66 +17,68 @@ Structured debugging methodology for this project. Enforces root cause analysis 
 
 Before touching any code:
 
-1. Ask for (or parse from context): the **exact error message**, **affected endpoint/component**, **stack trace**, and **when it started**.
+1. Ask for (or parse from context): the **exact error message**, **affected component**, **log output**, and **when it started**.
 2. Identify the error category:
-   - **5xx** → server-side (backend, DB, migration, config)
-   - **4xx** → auth/permission/routing issue
-   - **CORS** → proxy, cold start, or missing header
-   - **Build/type error** → frontend config, Tailwind, i18n, or TSC issue
+   - **Policy deny** → OpenShell proxy 阻擋出站流量（`action=deny` 在 logs）
+   - **Sandbox not running** → openshell sandbox 狀態異常
+   - **Credential missing** → OAuth token 或 API key 未注入
+   - **Script error** → `set -euo pipefail` 觸發的 bash 錯誤
 
-## Phase 2: Database / Migration Check (CHECK EARLY)
+## Phase 2: Sandbox / Policy State Check (CHECK EARLY)
 
-500 errors 最常見的 root cause 是 migration 沒跑。**在查 application code 之前先排除。**
+大多數問題的 root cause 是 sandbox 狀態或 policy 設定。**在查腳本邏輯之前先排除。**
 
 ```bash
-# 檢查 migration 狀態（依專案使用的 migration 工具調整指令）
-# 例如 Alembic:
-#   cd backend && uv run alembic current && uv run alembic heads
-# 例如 Prisma:
-#   cd backend && npx prisma migrate status
-# 例如 Drizzle:
-#   cd backend && npx drizzle-kit check
+# 檢查 sandbox 狀態
+openshell sandbox list
+
+# 檢查 deny log（policy 擋住的請求）
+openshell logs claude-dev --since 10m | grep "action=deny"
+openshell logs claw-agent --since 10m | grep "action=deny"
+
+# 驗證隔離
+make verify
 ```
 
 **快速判斷**：
-- `column "X" does not exist` → migration 未跑
-- `relation "X" does not exist` → table 的 migration 未跑
-- 本地正常、deploy 後 500 → CI/CD 沒跑 migration
+- `action=deny` 在 log → policy YAML 缺少該 host/method 白名單
+- sandbox 狀態 `stopped` → 執行 `openshell sandbox start <name>`
+- `make verify` 失敗 → credential 未注入或 landlock 設定異常
 
 ## Phase 3: Config Shadowing Check
 
-For proxy/networking/CORS/500 issues:
+For policy/credential/networking issues:
 
 ```bash
-# Check for duplicate config files that may shadow each other
-ls -la frontend/vite.config.*
-ls -la backend/*.env* .env*
+# Check for conflicting policy files
+ls -la policies/
 
 # Check recent changes that may have caused regression
 git log --oneline -10
-git diff HEAD~5 -- frontend/vite.config.ts backend/src/main.py
+git diff HEAD~5 -- policies/ scripts/ .env
 ```
 
 **Common shadow issues:**
-- `vite.config.js` shadowing `vite.config.ts`
 - `.env.local` overriding `.env` (not visible in git diff)
-- Docker environment missing variables that work locally
+- Policy YAML `version` 欄位型別錯誤（必須是整數，不是字串）
+- `binaries` 欄位遺漏導致 proxy 回 403
 
 ## Phase 4: Infrastructure Consistency Check
 
-For port changes, env var changes, or deployment issues:
+For policy or credential issues:
 
 ```bash
-# Check all locations where this value is configured
-grep -r "PORT\|8000\|8888" backend/ frontend/ --include="*.py" --include="*.ts" --include="*.env*" Dockerfile* docker-compose.yml
+# Check all locations where a value is configured
+grep -r "GEMINI_API_KEY\|CLAUDE" scripts/ policies/ .env.example
+
+# Check openshell provider list
+openshell provider list
 ```
 
 Always verify these locations are consistent:
-- Backend app config (e.g., `backend/src/main.py`)
-- Frontend proxy config (e.g., `frontend/vite.config.ts`)
-- `Dockerfile` and `docker-compose.yml`
-- Deployment config (CI/CD env vars)
-- OAuth redirect URIs (if applicable)
+- `policies/claude_dev_policy.yaml` 和 `policies/claw_agent_policy.yaml`
+- `scripts/setup-claude.sh` 和 `scripts/setup-claw.sh`（credential 注入邏輯）
+- `.env` / `.env.example`（API key 設定）
 
 ## Phase 5: Apply Fix
 
@@ -93,11 +94,11 @@ Only after identifying root cause:
 - Verify the actual user-facing behavior works end-to-end.
 
 ```bash
-# Run full test suite
-make test
+# 驗證隔離與 sandbox 狀態
+make verify
 
-# Test the specific endpoint/behavior that was broken
-curl -v http://localhost:8888/api/v1/<affected-endpoint>
+# 測試特定 sandbox 的連線能力（例如確認 policy 允許的 host 可連）
+openshell sandbox connect claude-dev -- curl -s https://api.anthropic.com/health 2>/dev/null || echo "check policy"
 ```
 
 Only report success after confirming the original problem is resolved.

@@ -1,26 +1,27 @@
 # Gemini Model 查詢與驗證
 
-查詢 Google Generative AI API 取得**實際可用的模型清單**，與 codebase 設定交叉比對。
+查詢 Google Generative AI API 取得**實際可用的模型清單**，與 MiniShell codebase 設定交叉比對。
 避免依賴過時文件導致 404 或 deprecation 問題。
 
 可選參數：`$ARGUMENTS`（`tts` / `live` / `llm` / `imagen` / 留空顯示全部）
 
 ## Step 1: 讀取 API Key
 
-從 `backend/.env` 讀取 `GEMINI_API_KEY`。
-如果當前目錄是 worktree，改讀 worktree 內的 `backend/.env`。
+從 `.env`（repo 根目錄）讀取 `GEMINI_API_KEY`。這是注入 `claw-agent` sandbox 的 credential。
 
 ```bash
-# 偵測 .env 位置（worktree 或主 repo）
-if [ -f backend/.env ]; then
-  ENV_FILE="backend/.env"
-elif [ -f /Users/howie/Workspace/github/heyu-ai/yibi-mvp/backend/.env ]; then
-  ENV_FILE="/Users/howie/Workspace/github/heyu-ai/yibi-mvp/backend/.env"
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+if [ -f "$REPO_ROOT/.env" ]; then
+  ENV_FILE="$REPO_ROOT/.env"
+elif [ -f "$REPO_ROOT/.env.local" ]; then
+  ENV_FILE="$REPO_ROOT/.env.local"
 fi
-grep GEMINI_API_KEY "$ENV_FILE"
+
+grep GEMINI_API_KEY "$ENV_FILE" 2>/dev/null || echo "⚠️ 找不到 GEMINI_API_KEY"
 ```
 
-如果找不到 `GEMINI_API_KEY`，停止並告知使用者需要設定。
+如果找不到 `GEMINI_API_KEY`，停止並告知使用者需要設定（參考 `.env.example` 或執行 `make setup-claw` 重新設定 credential）。
 
 ## Step 2: 查詢可用模型
 
@@ -62,14 +63,16 @@ GET https://generativelanguage.googleapis.com/v1beta/models?key=<API_KEY>&pageSi
 在 codebase 中搜尋所有 Gemini 模型引用：
 
 ```bash
-# 搜尋 backend 中的 gemini 模型名稱
-grep -rn 'gemini-[a-zA-Z0-9._-]*' backend/src/ --include="*.py" | grep -v __pycache__ | grep -v '.pyc'
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# 搜尋 scripts 和設定檔中的 gemini 模型名稱
+grep -rn 'gemini-[a-zA-Z0-9._-]*' "$REPO_ROOT/scripts/" "$REPO_ROOT/policies/" "$REPO_ROOT/.env.example" 2>/dev/null
 ```
 
-重點比對這些檔案中的模型設定：
-- `backend/src/infrastructure/config/settings.py` — 模型設定
-- `backend/src/infrastructure/providers/ai/gemini_client.py` — Gemini client
-- `backend/src/infrastructure/providers/tts/` — TTS provider
+重點比對這些位置的模型設定：
+- `scripts/setup-claw.sh` — claw-agent 使用的模型設定
+- `.env.example` — 預設模型範例值
+- `policies/claw_agent_policy.yaml` — policy 中允許的 API endpoint
 
 ## Step 5: 輸出報告
 
@@ -80,24 +83,19 @@ grep -rn 'gemini-[a-zA-Z0-9._-]*' backend/src/ --include="*.py" | grep -v __pyca
 查詢時間: <timestamp>
 
 --- Codebase Model Status ---
-✅ gemini-2.5-flash-preview-tts    → API 可用
-✅ gemini-2.5-pro-preview-tts      → API 可用
-❌ gemini-2.0-flash-live-001       → API 不存在（已下架？）
-⚠️ gemini-2.5-flash                → 可用，但有更新版 gemini-2.5-flash-002
+✅ gemini-2.5-flash          → API 可用
+❌ gemini-2.0-flash-001      → API 不存在（已下架？）
+⚠️ gemini-2.0-flash          → 可用，但有更新版 gemini-2.5-flash
 
 --- Available Models by Category ---
-
-🗣️ TTS Models:
-  gemini-2.5-flash-preview-tts
-  gemini-2.5-pro-preview-tts
-
-🎙️ Live API Models (bidiGenerateContent):
-  gemini-2.0-flash-live-001
-  ...
 
 🤖 LLM Models:
   gemini-2.5-flash
   gemini-2.5-pro
+  ...
+
+🎙️ Live API Models (bidiGenerateContent):
+  gemini-2.0-flash-live-001
   ...
 ```
 

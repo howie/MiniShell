@@ -30,12 +30,10 @@ echo "Current branch: $CURRENT"
 ## Step 3: Code Quality Check
 
 ```bash
-make check
-make test
+make verify
 ```
 
 - 如果失敗：修好後再繼續
-- 特別注意 frontend checks（CI 不跑 eslint/tsc，本地必須通過）
 
 ## Step 4: Selective Staging
 
@@ -71,8 +69,7 @@ gh pr create --title "fix(scope): 描述" --body "$(cat <<'EOF'
 - Fix: <修復方式>
 
 ## Test plan
-- [ ] `make check` passes
-- [ ] `make test` passes
+- [ ] `make verify` passes
 - [ ] Manual verification: <驗證步驟>
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

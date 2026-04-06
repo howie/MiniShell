@@ -1,71 +1,56 @@
-# Verify Deployment — 部署後驗證
+# Verify Apply — Policy / Script 套用後驗證
 
-部署後執行結構化驗證，確保服務正常運作。避免過早宣告成功。
+執行 `make apply-policies`、`make install` 或腳本變更後，執行結構化驗證確保 sandbox 正常運作。避免過早宣告成功。
 
-需要使用者提供：`$ARGUMENTS` 格式為 `<frontend-url> [backend-url]`
-如果只提供 frontend URL，backend URL 預設為同 host 的 `/api/v1`。
-
-## Step 1: Health Check
+## Step 1: Sandbox 狀態確認
 
 ```bash
-# Backend health
-curl -sf <backend-url>/api/v1/health | head -100
-echo "Backend: $?"
-
-# Frontend reachable
-curl -sf -o /dev/null -w "HTTP %{http_code}" <frontend-url>
-echo "Frontend: $?"
+openshell sandbox list
 ```
 
-- ✅ Backend 回 200 + JSON
-- ✅ Frontend 回 200
+- ✅ `claude-dev` 和 `claw-agent` 狀態均為 `running`
+- ❌ 任一 sandbox `stopped` → 執行 `openshell sandbox start <name>` 後繼續
 
-## Step 2: API Smoke Test
+## Step 2: Policy 生效確認
 
 ```bash
-# 未認證 endpoint 應回 200
-curl -sf <backend-url>/api/v1/health
-
-# 需認證 endpoint 應回 401（不是 500）
-curl -s -o /dev/null -w "%{http_code}" <backend-url>/api/v1/tts/providers
+# 確認 policy 已套用（顯示目前 active policy）
+openshell policy get claude-dev
+openshell policy get claw-agent
 ```
 
-- ✅ Public endpoint → 200
-- ✅ Protected endpoint → 401（不是 500、502、503）
-- ❌ 500 → 表示 server error，需要查 log
+- ✅ 回傳 policy 名稱和 hash 與剛套用的一致
+- ❌ hash 不符或 policy 為空 → 重跑 `make apply-policies`
 
-## Step 3: CORS Header 驗證
+## Step 3: Deny Log 檢查（無誤報）
 
 ```bash
-curl -s -I -X OPTIONS <backend-url>/api/v1/health \
-  -H "Origin: <frontend-url>" \
-  -H "Access-Control-Request-Method: GET" \
-  | grep -i "access-control"
+openshell logs claude-dev --since 5m | grep "action=deny"
+openshell logs claw-agent --since 5m | grep "action=deny"
 ```
 
-- ✅ `Access-Control-Allow-Origin` 包含 frontend URL
-- ❌ 缺少 CORS headers → 檢查 backend CORS config 和 `CORS_ORIGINS` 環境變數
+- ✅ 無 `action=deny` 或 deny 的 host 確實不在白名單內（預期行為）
+- ❌ 預期可用的 host 被 deny → 檢查 policy YAML 的 `endpoints` 設定
 
-## Step 4: Migration 驗證
-
-測試最近 migrate 過的 table 相關 endpoint：
+## Step 4: 隔離驗證
 
 ```bash
-# 如果最近有 migration，測試相關 endpoint 能回資料（不是 500）
-curl -s -o /dev/null -w "%{http_code}" <backend-url>/api/v1/<recent-migrated-endpoint>
+make verify
 ```
+
+- ✅ 所有 isolation check 通過
+- ❌ 任一 check 失敗 → 查看 `make verify` 輸出定位問題
 
 ## Step 5: Pass/Fail Report
 
 ```
-=== Deployment Verification ===
-Health (backend):  ✅ 200 OK
-Health (frontend): ✅ 200 OK
-Auth gate:         ✅ 401 (not 500)
-CORS:              ✅ headers present
-Migration:         ✅ endpoints responding
+=== Apply Verification ===
+Sandboxes:    ✅ claude-dev running, claw-agent running
+Policies:     ✅ claude_dev_policy applied, claw_agent_policy applied
+Deny logs:    ✅ no unexpected denies
+Isolation:    ✅ make verify passed
 ────────────────────────────────
-Verdict: ✅ PASS — deployment looks healthy
+Verdict: ✅ PASS — changes applied and sandboxes healthy
 ```
 
-如果任何項目 ❌，列出具體問題和建議的下一步（查 log、rollback、hotfix）。
+如果任何項目 ❌，列出具體問題和建議的下一步（查 log、重套 policy、重啟 sandbox）。

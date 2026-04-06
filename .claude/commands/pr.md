@@ -17,7 +17,7 @@ git status
 ### Step 2: Verify Code Quality
 
 ```bash
-make check
+make verify
 ```
 
 **Stop if any check fails.** Fix issues first, then re-run.
@@ -58,8 +58,7 @@ gh pr create --title "<type>(<scope>): <description>" --body "$(cat <<'EOF'
 - <list key files changed and why>
 
 ## Test plan
-- [ ] make check passes
-- [ ] make test passes
+- [ ] make verify passes
 - [ ] Manual verification: <describe what to verify>
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
