@@ -1,0 +1,38 @@
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_write:
+    - /sandbox
+    - /tmp
+    - /dev/null
+    - /home/agent/.openclaw
+  read_only:
+    - /app
+    - /usr
+    - /lib
+    - /proc
+    - /dev/urandom
+    - /etc
+    - /var/log
+
+landlock:
+  compatibility: best_effort
+
+network_policies:
+  ollama_local:
+    name: ollama_local
+    endpoints:
+      - { host: host.docker.internal, port: 11434 }
+      - { host: host.openshell.internal, port: 11434 }
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/curl }
+
+  npm_registry:
+    name: npm_registry
+    endpoints:
+      - { host: registry.npmjs.org, port: 443 }
+    binaries:
+      - { path: /usr/bin/node }
+      - { path: /usr/bin/npm }
