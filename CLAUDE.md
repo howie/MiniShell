@@ -13,8 +13,9 @@ make help              # 顯示所有 targets
 make install           # 完整安裝（互動式，含所有 phase，含 Ollama + Gemma 4）
 make install-base      # Phase 1-3：安裝 Homebrew、OrbStack、OpenShell CLI
 make setup-claude      # Phase 4-5：建立 Claude Code sandbox
-make quick-claw        # 一鍵啟動 OpenClaw（本地 Ollama gemma4，不需 API key）
-make setup-ollama      # 安裝 Ollama + Gemma 4 e4b 本地推理
+make quick-claw        # 一鍵啟動 OpenClaw（本地 Ollama gemma4:e2b，不需 API key）
+make tier-setup        # 三層推理分層設定（T1 本地/T2 Gemini Flash/T3 Claude Code）
+make setup-ollama      # 安裝 Ollama + Gemma 4 e2b 本地推理
 make setup-claw        # Phase 4+6：建立 OpenClaw sandbox
 make apply-policies    # Phase 7：套用網路沙箱政策 YAML
 make verify            # Phase 8：驗證檔案系統與 credential 隔離
@@ -52,15 +53,17 @@ make notebook-tunnel   # 從筆電建立 SSH tunnel（解決 Secure Context）
 2. **Credential 隔離** — Claude OAuth token 和 Ollama/Gemini credential 只注入各自對應的 sandbox
 3. **網路隔離（Policy Gateway）** — 所有出站流量走 OpenShell Proxy，依 YAML 白名單決策
 
-### 兩個 Sandbox
+### 三層推理架構（Tiered Inference）
 
-| Sandbox | 工具 | LLM | 認證方式 |
-|---------|------|-----|---------|
-| `claude-dev` | Claude Code | claude-opus/sonnet | OAuth（Pro/Max 訂閱） |
-| `claw-agent` | OpenClaw | Gemma 4 e4b (local) | Ollama (openai-compatible) |
-| `claw-ollama-gemma4` | OpenClaw | Gemma 4 (local) | Ollama（`make quick-claw` 一鍵建立） |
+| Tier | Sandbox | 工具 | LLM | 場景 | 延遲 |
+|------|---------|------|-----|------|------|
+| T3 重度 | `claude-dev` | Claude Code | claude-opus/sonnet | 複雜 coding、架構設計、PR review | 10-60s |
+| T2 標準 | `claw-agent` | OpenClaw | Gemini 2.5 Flash（雲端） | tool use、搜尋、摘要、中等 coding | 1-3s |
+| T1 快速 | `claw-ollama-gemma4` | OpenClaw | gemma4:e2b（本地） | 閒聊、問候、簡單 Q&A、翻譯 | <1s |
 
-> Gemini Flash 可作為選配雲端備援，安裝時選擇是否啟用。
+**T3 串聯**：claw-agent 透過 ACP Gateway 以 MCP tool 形式呼叫 claude-dev，T2 處理不了的任務自動升級到 T3。
+
+使用 `make tier-setup` 一次設定三層，或 `make quick-claw` 只建立 T1 本地 sandbox。
 
 ### Channel 整合
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 # setup-claw.sh — 建立 OpenClaw sandbox（Phase 4+6）
-# 預設使用本地 Gemma 4 e4b（透過 Ollama），Gemini Flash 為選配雲端備援
+# 預設使用雲端 Gemini 2.5 Flash（T2），本地 Ollama 作為 fallback（T1）
+# T3 重度推理由 ACP Gateway 轉送至 Claude Code（需另執行 make setup-acp-gateway）
 set -euo pipefail
 
 GREEN='\033[0;32m'
@@ -12,7 +13,7 @@ info()  { echo -e "${GREEN}[✓]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 step()  { echo -e "${BLUE}[→]${NC} $1"; }
 
-LOCAL_MODEL="gemma4:e4b"
+LOCAL_MODEL="gemma4:e2b"   # T1 本地 fallback（輕量，<1s 回應）
 
 # ── 確認前置條件 ──────────────────────────────────────────────────────────────
 if ! command -v openshell &>/dev/null; then
@@ -119,32 +120,43 @@ fi
 echo ""
 echo "── 設定 OpenClaw Inference ──────────────────────────"
 
+# Gateway inference routing 只支援 openai-type provider（Ollama）
+# Gemini 為 generic provider，不走 gateway routing，改由 sandbox 內 inference.json 直接配置
 if [ "$HAS_OLLAMA" = true ]; then
-  step "設定 inference routing（ollama-local / ${LOCAL_MODEL}）..."
+  step "設定 gateway inference routing（ollama-local / ${LOCAL_MODEL}）..."
+  # 注意：openshell inference set 是 gateway-level，不支援 --sandbox flag
   openshell inference set \
-    --sandbox claw-agent \
     --provider ollama-local \
-    --model "${LOCAL_MODEL}" 2>/dev/null && info "Inference routing 已設定" || \
-    warn "Inference routing 設定失敗（可能 openshell 版本不支援 --sandbox flag）"
+    --model "${LOCAL_MODEL}" 2>/dev/null && info "Gateway inference routing 已設定（本地 ${LOCAL_MODEL}）" || \
+    warn "Gateway inference routing 設定失敗"
 elif [ "$HAS_GEMINI" = true ]; then
-  step "設定 inference routing（gemini-flash）..."
-  openshell inference set \
-    --sandbox claw-agent \
-    --provider gemini-flash \
-    --model gemini-3-flash 2>/dev/null && info "Inference routing 已設定（Gemini Flash）" || \
-    warn "Inference routing 設定失敗"
+  info "Gateway inference routing 略過（gemini-flash 為 generic provider，不走 inference.local）"
+  info "OpenClaw 將透過 sandbox 內 inference.json 直接連接 Gemini API"
 else
   warn "沒有可用的推理後端"
-  warn "請先執行 make setup-ollama 以啟用本地推理"
+  warn "建議執行 make setup-ollama 啟用本地推理，或在上方輸入 Gemini API Key"
 fi
 
 # ── OpenClaw 自動 Onboarding ─────────────────────────────────────────────────
 echo ""
 echo "── OpenClaw 自動 Onboarding ─────────────────────────"
 
-if [ "$HAS_OLLAMA" = true ]; then
-  step "自動設定 OpenClaw 推理端點（${LOCAL_MODEL}）..."
+if [ "$HAS_GEMINI" = true ]; then
+  step "自動設定 OpenClaw 推理端點（T2：Gemini 2.5 Flash）..."
   # 等待 sandbox 完全就緒
+  sleep 2
+  openshell sandbox connect claw-agent -- bash -c "
+    mkdir -p /home/agent/.openclaw
+    cat > /home/agent/.openclaw/inference.json << 'INNEREOF'
+{
+  \"provider\": \"google-ai\",
+  \"model\": \"gemini-2.5-flash\"
+}
+INNEREOF
+  " 2>/dev/null && info "OpenClaw onboarding 完成（Gemini 2.5 Flash）" || \
+    warn "自動 onboarding 失敗，請進入 sandbox 後手動執行 openclaw onboard"
+elif [ "$HAS_OLLAMA" = true ]; then
+  step "自動設定 OpenClaw 推理端點（T1 fallback：${LOCAL_MODEL}）..."
   sleep 2
   openshell sandbox connect claw-agent -- bash -c "
     mkdir -p /home/agent/.openclaw
@@ -157,19 +169,6 @@ if [ "$HAS_OLLAMA" = true ]; then
 }
 INNEREOF
   " 2>/dev/null && info "OpenClaw onboarding 完成（本地 ${LOCAL_MODEL}）" || \
-    warn "自動 onboarding 失敗，請進入 sandbox 後手動執行 openclaw onboard"
-elif [ "$HAS_GEMINI" = true ]; then
-  step "自動設定 OpenClaw 推理端點（Gemini Flash）..."
-  sleep 2
-  openshell sandbox connect claw-agent -- bash -c "
-    mkdir -p /home/agent/.openclaw
-    cat > /home/agent/.openclaw/inference.json << 'INNEREOF'
-{
-  \"provider\": \"google-ai\",
-  \"model\": \"gemini-3-flash\"
-}
-INNEREOF
-  " 2>/dev/null && info "OpenClaw onboarding 完成（Gemini Flash）" || \
     warn "自動 onboarding 失敗，請進入 sandbox 後手動執行 openclaw onboard"
 else
   warn "無推理後端，略過自動 onboarding"
@@ -191,6 +190,12 @@ fi
 
 CHANNELS_JSON="{}"
 ENABLED_CHANNELS=""
+
+# 非互動模式（如 make tier-setup）自動略過 channel 設定
+if [[ ! -t 0 ]]; then
+  info "非互動模式，略過 channel 設定"
+  info "稍後可執行 make setup-claw 互動式設定 channel"
+else
 
 # ── Telegram ──
 echo -n "  啟用 Telegram？[y/N]: "
@@ -359,6 +364,8 @@ else
   info "未啟用任何 channel（可稍後進入 sandbox 執行 openclaw configure --section channels）"
 fi
 
+fi  # end of interactive-only block
+
 # ── 完成 ──────────────────────────────────────────────────────────────────────
 echo ""
 info "OpenClaw sandbox 建立完成！"
@@ -366,25 +373,32 @@ echo ""
 echo "  下一步："
 echo "  1. openshell sandbox connect claw-agent"
 
-if [ "$HAS_OLLAMA" = true ]; then
-  echo "  2. 推理已自動設定為本地 ${LOCAL_MODEL}，可直接使用"
-  echo "  3. 驗證推理："
-  echo "     curl https://inference.local/v1/models"
+if [ "$HAS_GEMINI" = true ]; then
+  echo "  2. 推理已設定為 Gemini 2.5 Flash（T2 標準層）"
   echo ""
-  echo "  切換推理後端（在 sandbox 外執行）："
-  echo "  本地 Ollama ："
-  echo "    openshell inference set --sandbox claw-agent --provider ollama-local --model ${LOCAL_MODEL}"
-  if [ "$HAS_GEMINI" = true ]; then
-    echo "  雲端 Gemini ："
-    echo "    openshell inference set --sandbox claw-agent --provider gemini-flash --model gemini-3-flash"
+  echo "  分層架構："
+  echo "    T2 標準（此 sandbox）：gemini-flash → Gemini 2.5 Flash（工具/摘要/中等 coding）"
+  if [ "$HAS_OLLAMA" = true ]; then
+    echo "    T1 快速（quick-claw）：ollama-local → ${LOCAL_MODEL}（閒聊/問候/快速回應）"
   fi
-elif [ "$HAS_GEMINI" = true ]; then
-  echo "  2. 推理已自動設定為 Gemini Flash"
+  echo "    T3 重度（ACP Gateway）：claude-code MCP tool → Claude Code（複雜 coding/架構）"
   echo ""
-  echo "  若日後啟用本地推理，請執行 make setup-ollama，再重新執行 make setup-claw"
+  echo "  切換推理後端（在 sandbox 外執行，gateway-level）："
+  echo "    T2 雲端 Gemini："
+  echo "      openshell inference set --provider gemini-flash --model gemini-2.5-flash"
+  if [ "$HAS_OLLAMA" = true ]; then
+    echo "    T1 本地 Ollama（fallback）："
+    echo "      openshell inference set --provider ollama-local --model ${LOCAL_MODEL}"
+  fi
+elif [ "$HAS_OLLAMA" = true ]; then
+  echo "  2. 推理已設定為本地 ${LOCAL_MODEL}（T1 本地層）"
+  echo "  建議另外設定 Gemini Flash 作為 T2，請重新執行 make setup-claw 並輸入 API Key"
+  echo "  切換到 Gemini（設定後）："
+  echo "    openshell inference set --provider gemini-flash --model gemini-2.5-flash"
 else
   echo "  2. 請先設定推理後端："
-  echo "     make setup-ollama   （本地 Gemma 4 e4b）"
+  echo "     make setup-ollama   （T1 本地 ${LOCAL_MODEL}）"
+  echo "     或重新執行 make setup-claw 並輸入 Gemini API Key（T2 雲端）"
 fi
 
 if [[ -n "$ENABLED_CHANNELS" ]]; then
