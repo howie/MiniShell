@@ -19,6 +19,7 @@ CONFIG_PATH="$CONFIG_DIR/config.json"
 ENV_FILE="$CONFIG_DIR/.env"
 SSH_HOST="openshell-claude-dev"
 CLAW_SSH_HOST="openshell-claw-agent"
+CLAW_HOME="/sandbox"
 GATEWAY_PORT=7865
 
 echo ""
@@ -49,9 +50,9 @@ if ! ssh -o ConnectTimeout=5 "$SSH_HOST" 'echo ok' &>/dev/null; then
 fi
 echo "  ✓ SSH → $SSH_HOST"
 
-# Verify claw-agent sandbox exists.
+# Verify claw-agent sandbox exists and is reachable.
 if ! ssh -o ConnectTimeout=5 "$CLAW_SSH_HOST" 'echo ok' &>/dev/null; then
-  echo "  ✗ 無法 SSH 到 $CLAW_SSH_HOST — 確認 claw-agent sandbox 已建立"
+  echo "  ✗ 無法 SSH 到 $CLAW_SSH_HOST — 確認 claw-agent sandbox 已建立且 SSH config 已設定"
   exit 1
 fi
 echo "  ✓ SSH → $CLAW_SSH_HOST"
@@ -64,7 +65,7 @@ echo "[2/6] 設定認證..."
 mkdir -p "$CONFIG_DIR"
 
 if [[ -f "$ENV_FILE" ]] && grep -q "ACP_GATEWAY_TOKEN=" "$ENV_FILE"; then
-  echo "  ✓ Auth token 已存在（$ENV_FILE）"
+  echo "  ✓ Auth token 已存在（${ENV_FILE}）"
   # shellcheck source=/dev/null
   source "$ENV_FILE"
 else
@@ -118,7 +119,7 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
 CONFIGEOF
   echo "  ✓ 已建立 $CONFIG_PATH"
 else
-  echo "  ✓ Config 已存在（$CONFIG_PATH）"
+  echo "  ✓ Config 已存在（${CONFIG_PATH}）"
 fi
 
 echo ""
@@ -126,20 +127,22 @@ echo ""
 # ── Phase 5: Configure claw-agent MCP integration ────────────────────────────
 echo "[5/6] 設定 claw-agent MCP 整合..."
 
+OPENCLAW_CONFIG="$CLAW_HOME/.openclaw/openclaw.json"
+
 # Inject auth token into claw-agent.
-ssh "$CLAW_SSH_HOST" "mkdir -p /home/agent/.openclaw"
-echo "$ACP_GATEWAY_TOKEN" | ssh "$CLAW_SSH_HOST" "cat > /home/agent/.openclaw/acp-token && chmod 600 /home/agent/.openclaw/acp-token"
+ssh "$CLAW_SSH_HOST" "mkdir -p $CLAW_HOME/.openclaw" || {
+  echo "  ✗ 無法 SSH 到 $CLAW_SSH_HOST"
+  exit 1
+}
+echo "$ACP_GATEWAY_TOKEN" | ssh "$CLAW_SSH_HOST" \
+  "cat > $CLAW_HOME/.openclaw/acp-token && chmod 600 $CLAW_HOME/.openclaw/acp-token"
 echo "  ✓ Auth token 已注入 claw-agent"
 
-# Upload MCP stdio wrapper as fallback.
+# Upload MCP stdio wrapper.
 ssh "$CLAW_SSH_HOST" "mkdir -p /sandbox/mcp-claude-code"
-scp -q "$MCP_WRAPPER_DIR/package.json" "$CLAW_SSH_HOST:/sandbox/mcp-claude-code/"
-scp -q "$MCP_WRAPPER_DIR/index.js" "$CLAW_SSH_HOST:/sandbox/mcp-claude-code/"
+ssh "$CLAW_SSH_HOST" "cat > /sandbox/mcp-claude-code/package.json" < "$MCP_WRAPPER_DIR/package.json"
+ssh "$CLAW_SSH_HOST" "cat > /sandbox/mcp-claude-code/index.js" < "$MCP_WRAPPER_DIR/index.js"
 echo "  ✓ MCP stdio wrapper 已上傳到 claw-agent:/sandbox/mcp-claude-code/"
-
-# Update openclaw.json to register MCP server.
-# We use the stdio transport (reliable) as primary, with the gateway URL in env.
-OPENCLAW_CONFIG="/home/agent/.openclaw/openclaw.json"
 
 # Read existing config or create new one.
 EXISTING_CONFIG=$(ssh "$CLAW_SSH_HOST" "cat $OPENCLAW_CONFIG 2>/dev/null" || echo '{}')
@@ -162,7 +165,7 @@ else
       transport: \"stdio\",
       env: {
         ACP_GATEWAY_URL: \"http://host.docker.internal:$GATEWAY_PORT\",
-        ACP_GATEWAY_TOKEN: fs.readFileSync(\"/home/agent/.openclaw/acp-token\", \"utf8\").trim()
+        ACP_GATEWAY_TOKEN: fs.readFileSync(\"$CLAW_HOME/.openclaw/acp-token\", \"utf8\").trim()
       }
     };
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + \"\\n\");

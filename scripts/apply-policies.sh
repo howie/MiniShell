@@ -69,7 +69,7 @@ if openshell sandbox list 2>/dev/null | grep -q "claw-ollama-gemma4"; then
     openshell policy set claw-ollama-gemma4 --policy "$QUICK_POLICY" --wait
     info "claw-ollama-gemma4 policy 套用完成"
   else
-    warn "找不到 $QUICK_POLICY（claw-ollama-gemma4 sandbox 存在但 policy 檔案遺失）"
+    warn "找不到 ${QUICK_POLICY}（claw-ollama-gemma4 sandbox 存在但 policy 檔案遺失）"
   fi
 fi
 

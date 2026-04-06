@@ -13,7 +13,7 @@ info()  { echo -e "${GREEN}[✓]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 step()  { echo -e "${BLUE}[→]${NC} $1"; }
 
-MODEL="${1:-gemma4}"
+MODEL="${1:-gemma4:e2b}"   # T1 快速層預設，可覆蓋：make quick-claw MODEL=gemma4:e4b
 SANDBOX_NAME="claw-ollama-gemma4"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
