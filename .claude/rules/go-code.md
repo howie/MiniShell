@@ -45,15 +45,33 @@ func main() {
 
 ## Graceful Shutdown
 
-使用 `signal.NotifyContext` 處理 SIGTERM/SIGINT：
+使用 `signal.NotifyContext` 處理 SIGTERM/SIGINT。清理邏輯在 goroutine 中執行，主 goroutine 用 WaitGroup 等待所有工作完成：
 
 ```go
 ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 defer stop()
 
-// 啟動服務後等待 signal
-<-ctx.Done()
-// 執行清理
+// 逾時強制退出（在單獨的 goroutine 中）
+go func() {
+    <-ctx.Done()
+    time.AfterFunc(10*time.Second, func() {
+        slog.Error("shutdown timed out — forcing exit")
+        os.Exit(1)
+    })
+}()
+
+var wg sync.WaitGroup
+for _, worker := range workers {
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        if err := worker.Run(ctx); err != nil && ctx.Err() == nil {
+            slog.Error("worker error", "err", err)
+            stop() // cascade shutdown
+        }
+    }()
+}
+wg.Wait() // 主 goroutine 在此等待，不是在 <-ctx.Done()
 ```
 
 ## Error Handling
@@ -67,6 +85,8 @@ defer stop()
 `bridge-go/` 和 `acp-gateway/` 是各自獨立的 Go module，有自己的 `go.mod`。修改時在對應目錄下執行 `go build`：
 
 ```bash
-cd bridge-go && go build -o ../bridge .
-cd acp-gateway && go build .
+cd bridge-go && go build .        # 產出 bridge-go/bridge-go
+cd acp-gateway && go build .      # 產出 acp-gateway/acp-gateway
 ```
+
+Binary 輸出在各自的模組目錄下，`.gitignore` 已排除這兩個路徑（`bridge-go/bridge-go`、`acp-gateway/acp-gateway`）。

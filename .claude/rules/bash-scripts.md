@@ -7,7 +7,7 @@ paths:
 
 ## 嚴格模式（必要）
 
-每個腳本的第二行必須是：
+每個腳本的 shebang 和 comment header 之後必須緊接著：
 
 ```bash
 set -euo pipefail

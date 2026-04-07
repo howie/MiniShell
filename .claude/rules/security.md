@@ -21,11 +21,12 @@
 
 Policy YAML 的 `binaries` 欄位不可省略。省略任一條路徑會導致 OpenShell Proxy 回 403。
 
-Claude Code 的三條路徑必須全部列出：
+Claude Code 的四條路徑必須全部列出：
 ```yaml
 binaries:
   - { path: /usr/local/bin/claude }
   - { path: "/sandbox/.local/bin/claude" }
+  - { path: "/sandbox/.local/bin/claude-runner" }   # renamed copy，繞過 --trust 注入
   - { path: "/sandbox/.local/share/claude/versions/**" }
 ```
 

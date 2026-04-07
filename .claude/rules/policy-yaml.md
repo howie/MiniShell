@@ -25,24 +25,23 @@ network_policies:
 | 錯誤 | 正確 |
 |------|------|
 | `version: "1"` | `version: 1` |
-| endpoint 層級放 `enforcement` | policy 頂層放 `enforcement` |
 | 省略 `binaries` | 每個 policy 都必須有 `binaries` |
 
-## Claude Code Binary 三條路徑
+`enforcement` 可出現在 endpoint 層級（`enforcement: enforce`），這是合法寫法，不是錯誤。
 
-所有涉及 Claude Code 的 policy 必須同時列出三條路徑，少一條就會 403：
+## Claude Code Binary 四條路徑
+
+所有涉及 Claude Code 的 policy 必須同時列出四條路徑，少任一條就會 403：
 
 ```yaml
 binaries:
   - { path: /usr/local/bin/claude }
   - { path: "/sandbox/.local/bin/claude" }
+  - { path: "/sandbox/.local/bin/claude-runner" }   # renamed copy，繞過 --trust 注入
   - { path: "/sandbox/.local/share/claude/versions/**" }
 ```
 
-如果有 `claude-runner`（renamed binary），也要加上：
-```yaml
-  - { path: "/sandbox/.local/bin/claude-runner" }
-```
+`claude-runner` 是 `claude` 的 renamed copy，讓 OpenShell 識別為不同 binary，必須列入。
 
 ## Live Sandbox 限制
 

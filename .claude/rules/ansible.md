@@ -50,10 +50,12 @@ make gw-restart       # 重啟 gateway
 make sandbox-check    # 健康檢查
 ```
 
-直接執行時用 `uvx`：
+直接執行時用 `uvx`（從 repo 根目錄，使用完整相對路徑）：
 ```bash
 uvx --from ansible-core ansible-playbook -i ansible/inventory.yml ansible/playbooks/foo.yml
 ```
+
+注意：Makefile 的各 ansible target 用的是 `cd ansible &&` 前綴，inventory 和 playbook 路徑因此相對於 `ansible/` 目錄。直接執行時不需 `cd`，使用 repo 根目錄的路徑即可。
 
 ## Inventory 結構
 

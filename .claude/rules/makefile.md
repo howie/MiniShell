@@ -40,10 +40,10 @@ help:
 
 ## 變數規範
 
-| 變數 | 用途 |
-|------|------|
-| `SCRIPTS` | 腳本目錄路徑 (`scripts`) |
-| `ANSIBLE_PLAYBOOK` | ansible-playbook 執行指令 |
+| 變數 | 值 | 用途 |
+|------|-----|------|
+| `SCRIPTS` | `scripts` | 腳本目錄路徑 |
+| `ANSIBLE_PLAYBOOK` | `uvx --from ansible-core ansible-playbook` | `ansible-playbook` 不需全域安裝，透過 `uvx` 執行 |
 
 不要在 target 中硬寫路徑，使用變數引用。
 
