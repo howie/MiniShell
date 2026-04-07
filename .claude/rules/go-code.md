@@ -80,6 +80,21 @@ wg.Wait() // 主 goroutine 在此等待，不是在 <-ctx.Done()
 - **運行階段**錯誤：回傳 `error`，由上層決定是否記錄或重試
 - 不使用裸 `panic()`（除非是真正不可恢復的 invariant 違反）
 
+## 依賴版本鎖定
+
+禁止使用 `go get -u` 進行全域升級，保持 `go.sum` 的穩定性：
+
+```bash
+# 禁止
+go get -u ./...
+go get -u some/package
+
+# 正確：有需要才升級特定套件，並測試後 commit go.sum
+go get some/package@v1.2.3
+```
+
+`go.sum` 的變更必須有明確理由，升級前需在本地測試通過才 commit。
+
 ## 兩個獨立 Go 模組
 
 `bridge-go/` 和 `acp-gateway/` 是各自獨立的 Go module，有自己的 `go.mod`。修改時在對應目錄下執行 `go build`：

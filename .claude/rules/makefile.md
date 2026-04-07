@@ -47,6 +47,18 @@ help:
 
 不要在 target 中硬寫路徑，使用變數引用。
 
+## `make lint` 規範驗證
+
+提交前可用 `make lint` 自動驗證規範合規性：
+
+```makefile
+lint:
+	@find $(SCRIPTS) -name "*.sh" -exec shellcheck {} \;    # Bash 嚴格模式檢查
+	@find policies -name "*.yaml" -exec yamllint -d relaxed {} \;  # Policy YAML 格式
+```
+
+需要安裝：`brew install shellcheck yamllint`
+
 ## Ansible Target 模式
 
 ```makefile

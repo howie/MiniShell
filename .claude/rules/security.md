@@ -30,6 +30,17 @@ binaries:
   - { path: "/sandbox/.local/share/claude/versions/**" }
 ```
 
+## `.env.example` 同步
+
+每當新增一個環境變數依賴時，**必須同步更新 `.env.example`**（值留空或使用佔位符）：
+
+```bash
+# .env.example
+NEW_SERVICE_TOKEN=          # 說明：從 xxx 取得
+```
+
+這確保新環境部署時不會因為遺漏 env var 而失敗。
+
 ## 環境變數驗證
 
 Go 和腳本在啟動時必須驗證所有必要的環境變數，缺少時 fail-fast（不要讓程式跑到一半才失敗）。

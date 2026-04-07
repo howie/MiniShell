@@ -6,6 +6,22 @@ paths:
 
 # Ansible 規範
 
+## Module FQCN（必要）
+
+一律使用 **Fully Qualified Collection Name**，避免多 Collection 環境下的模組衝突：
+
+```yaml
+# 正確
+ansible.builtin.shell:
+ansible.builtin.wait_for:
+ansible.builtin.debug:
+
+# 錯誤（短名可能衝突）
+shell:
+wait_for:
+debug:
+```
+
 ## Task 命名
 
 Task name 使用繁體中文，清楚描述動作目標：

@@ -2,7 +2,7 @@ SHELL := /bin/bash
 SCRIPTS := scripts
 ANSIBLE_PLAYBOOK := uvx --from ansible-core ansible-playbook
 
-.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go setup-acp-gateway quick-claw tier-setup status dashboard gw-restart sandbox-check notebook-tunnel
+.PHONY: help install setup-host install-base setup-claude setup-claw apply-policies verify setup-ollama setup-bridge setup-bridge-go setup-acp-gateway quick-claw tier-setup status dashboard gw-restart sandbox-check notebook-tunnel lint
 
 # 預設 target：顯示說明
 help:
@@ -23,6 +23,7 @@ help:
 	@echo "  make setup-bridge     安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack）"
 	@echo "  make setup-acp-gateway 安裝 ACP Gateway（選配：讓 OpenClaw 使用 Claude Code）"
 	@echo "  make status           查看目前 sandbox 狀態"
+	@echo "  make lint             靜態檢查（shellcheck + yamllint）"
 	@echo ""
 	@echo "Ansible 自動化："
 	@echo "  make dashboard        一鍵啟動 OpenClaw Dashboard（設定 config + gateway + LAN tunnel）"
@@ -127,6 +128,14 @@ gw-restart:
 sandbox-check:
 	@echo "執行健康檢查..."
 	@cd ansible && $(ANSIBLE_PLAYBOOK) -i inventory.yml playbooks/sandbox-status.yml
+
+# 靜態檢查：shellcheck（Bash 腳本）+ yamllint（Policy YAML）
+lint:
+	@echo "── shellcheck ────────────────────────────────────"
+	@find $(SCRIPTS) -name "*.sh" -exec shellcheck {} \;
+	@echo "── yamllint ──────────────────────────────────────"
+	@find policies -name "*.yaml" -exec yamllint -d relaxed {} \;
+	@echo "── 檢查完成 ──────────────────────────────────────"
 
 # 狀態查看
 status:
