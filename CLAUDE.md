@@ -22,6 +22,7 @@ make verify            # Phase 8：驗證檔案系統與 credential 隔離
 make status            # 查看 sandbox 目前狀態
 make setup-host        # Phase 0：主機優化（防火牆、TCP Keepalive、Power Nap）
 make setup-bridge      # 安裝 Go Messaging Bridge（選配：Discord/Telegram/Slack）
+make lint              # 靜態檢查（shellcheck + yamllint）
 ```
 
 ### Sandbox 操作
@@ -65,6 +66,17 @@ make notebook-tunnel   # 從筆電建立 SSH tunnel（解決 Secure Context）
 
 使用 `make tier-setup` 一次設定三層，或 `make quick-claw` 只建立 T1 本地 sandbox。
 
+### 元件目錄
+
+| 目錄 | 語言 | 用途 |
+|------|------|------|
+| `scripts/` | Bash | 安裝與設定腳本（Phase 0-8） |
+| `bridge-go/` | Go | Messaging Bridge（Discord/Telegram/Slack 轉發） |
+| `acp-gateway/` | Go | ACP Gateway HTTP server（讓 OpenClaw 呼叫 Claude Code） |
+| `mcp-claude-code/` | Node.js | Stdio MCP Server（ACP Gateway 的 MCP 介面，供 OpenClaw 使用） |
+| `ansible/` | YAML | Ansible playbooks（dashboard、gateway 管理、健康檢查） |
+| `policies/` | YAML | OpenShell 網路沙箱政策（per-sandbox YAML 白名單） |
+
 ### Channel 整合
 
 claw-agent 透過 OpenClaw 內建 channel 支援連接通訊平台（單一 agent，多 channel 架構）：
@@ -79,48 +91,16 @@ claw-agent 透過 OpenClaw 內建 channel 支援連接通訊平台（單一 agen
 Token 可預填在 `.env`（參考 `.env.example`），安裝時自動讀取。
 事後管理：`openclaw configure --section channels`（在 sandbox 內執行）。
 
-## Policy YAML 注意事項
+## 程式碼規範
 
-Policy 檔位於 `policies/` 目錄，修改後用 `make apply-policies` 套用。
+詳細的語言/工具規範在 `.claude/rules/` 目錄下，依正在編輯的檔案類型自動載入：
 
-**Schema 正確寫法：**
-
-```yaml
-version: 1   # 整數，不是字串
-
-network_policy:
-  policies:
-    - name: some_service
-      enforcement:                 # enforcement 在 policy 層級，不是 endpoint 層級
-        - binaries:
-            - /path/to/binary      # binaries 必填，不能省略
-      endpoints:
-        - host: api.example.com
-          ports: [443]
-          methods: [GET, POST]
-```
-
-**Claude Code Binary 路徑（三個都要列）：**
-- `/usr/local/bin/claude`
-- `/sandbox/.local/bin/claude`
-- `/sandbox/.local/share/claude/versions/**`（glob 模式）
-
-省略任一個會導致 proxy 回 403。
-
-**Live sandbox 限制：** 運行中的 sandbox 只能透過熱更新**新增**網路路徑，不能移除已有路徑。需要移除時要重啟 sandbox。
-
-## Bridge Go 開發
-
-Go Messaging Bridge 位於 `bridge-go/` 目錄，負責轉發訊息到 Discord/Telegram/Slack。
-
-```bash
-cd bridge-go
-go build -o ../bridge .    # 編譯
-./bridge                    # 執行（需設定 .env）
-```
-
-設定從 `.env` 讀取（參考 `.env.example`）。
-
-## 腳本規範
-
-所有 Bash 腳本使用 `set -euo pipefail` 嚴格模式，並具備冪等性（重複執行安全）。修改腳本時維持這個慣例。
+| Rule 檔案 | 載入時機 | 涵蓋內容 |
+|-----------|---------|---------|
+| `security.md` | 永遠 | Secrets 管理、credential 隔離、env var 驗證 |
+| `bash-scripts.md` | `scripts/**/*.sh` | `set -euo pipefail`、冪等性、color helpers |
+| `go-code.md` | `bridge-go/`、`acp-gateway/` `.go` | slog、graceful shutdown、依賴鎖定 |
+| `policy-yaml.md` | `policies/**/*.yaml` | Schema、4 條 Claude binary 路徑、live sandbox 限制 |
+| `ansible.md` | `ansible/**/*.yml` | FQCN、繁體中文 task name、`changed_when` |
+| `makefile.md` | `Makefile` | `.PHONY`、`chmod +x`、`make lint` |
+| `mcp-server.md` | `mcp-claude-code/**/*.js` | ESM、JSON-RPC stdio 職責分離 |
